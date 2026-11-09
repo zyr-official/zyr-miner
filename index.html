@@ -212,7 +212,6 @@
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505');
 
-    // ✅ دامنه کلودفلر تو اینجا جایگذاری شد
     const BACKEND = 'https://nann.pingooshop.ir'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
     
@@ -249,12 +248,36 @@
       }
     }
 
+    // ✅ بررسی عضویت واقعی
     async function checkMembership() {
-      const st = document.getElementById('status-join'); const btn = document.getElementById('btn-next-1');
-      st.textContent = 'Verifying...'; st.className = 'status'; btn.disabled = true;
-      await new Promise(r => setTimeout(r, 800)); 
-      st.textContent = '✅ Verified...'; st.className = 'status ok';
-      setTimeout(() => { showScreen('screen-pay'); initTonConnect(); }, 800);
+      const st = document.getElementById('status-join'); 
+      const btn = document.getElementById('btn-next-1');
+      st.textContent = 'Checking membership...'; 
+      st.className = 'status'; 
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(BACKEND + '/check-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+
+        if (data.isMember) {
+            st.textContent = '✅ Verified! Proceeding...'; 
+            st.className = 'status ok';
+            setTimeout(() => { showScreen('screen-pay'); initTonConnect(); }, 800);
+        } else {
+            st.textContent = '❌ You must join the channel first.'; 
+            st.className = 'status err'; 
+            btn.disabled = false;
+        }
+      } catch (e) {
+        st.textContent = '❌ Error checking membership.'; 
+        st.className = 'status err'; 
+        btn.disabled = false;
+      }
     }
 
     function initTonConnect() {
@@ -368,4 +391,4 @@
     }
   </script>
 </body>
-                                                              </html>
+                                                                                                                                                                                                                                                            </html>
