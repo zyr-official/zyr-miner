@@ -122,7 +122,7 @@
       <div class="top-bar">
         <div class="profile">
           <div class="profile-img" id="user-avatar"><svg viewBox="0 0 24 24" fill="var(--muted)" width="24" height="24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
-          <div class="profile-name"><h2 id="user-name">ZYR User</h2><p>Node Active</p></div>
+          <div class="profile-name"><h2 id="user-name">ZYR User</h2><p id="user-level">Level 1</p></div>
         </div>
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
@@ -136,7 +136,7 @@
       <div class="mining-engine">
         <div class="engine-info">
           <div class="engine-status"><div class="pulse"></div> Engine Running</div>
-          <div class="engine-rate">+100 <span>ZYR / day</span></div>
+          <div class="engine-rate">+<span id="rate-display">80</span> <span>ZYR / day</span></div>
         </div>
         <div class="live-icon">
             <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -144,7 +144,7 @@
       </div>
 
       <div class="stats">
-        <div class="stat-card"><div class="stat-header">Per Hour</div><div class="stat-value">4.16 ZYR</div></div>
+        <div class="stat-card"><div class="stat-header">Per Hour</div><div class="stat-value"><span id="hour-display">3.33</span> ZYR</div></div>
         <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
       </div>
 
@@ -164,8 +164,16 @@
         </div>
         <div class="badge" style="font-size: 14px;">🇬🇧 EN</div>
       </div>
-      <div class="friends-header"><h1>Friends</h1><p>Invite friends and earn 300 ZYR when they activate their miner.</p></div>
-      <div class="info-box">A referral counts only on first entry: they open the bot chat from your link, tap Start, and open the app for the first time. Repeat visits via someone else's link do not count. <strong>300 ZYR is credited when an active friend pays the 0.1 TON deposit.</strong></div>
+      <div class="friends-header"><h1>Friends</h1><p>Invite friends and earn 300 ZYR when they activate their miner. More friends = higher mining rate!</p></div>
+      
+      <div class="info-box">
+        <strong>Boost Levels:</strong><br>
+        Level 1 (0 friends): 80 ZYR/day<br>
+        Level 2 (5 friends): 110 ZYR/day<br>
+        Level 3 (10 friends): 130 ZYR/day<br>
+        Level 4 (20 friends): 150 ZYR/day
+      </div>
+
       <div class="action-row">
         <button class="action-btn" onclick="copyRefLink()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button>
         <button class="action-btn" onclick="shareRefLink()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share</button>
@@ -234,9 +242,10 @@
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
     
     let tonConnectUI, syncInterval, animateInterval;
-    let serverBalance = 0;     // موجودی ذخیره شده در سرور
-    let pendingMined = 0;      // مقدار ماین شده که هنوز کلیم نشده
-    const TOKENS_PER_SECOND = 100 / 86400; 
+    let serverBalance = 0;
+    let pendingMined = 0;
+    let currentRatePerDay = 80; // پیش‌فرض لول ۱
+    let tokensPerSecond = currentRatePerDay / 86400;
 
     const tgUser = tg.initDataUnsafe?.user || { id: '123456789', first_name: 'ZYR User' };
     const userId = tgUser.id.toString();
@@ -249,7 +258,6 @@
         referrerId = startParam.replace('ref_', '');
     }
 
-    // ✅ تابع سینک با سرور
     async function syncUser() {
       try {
         const res = await fetch(BACKEND + '/sync-user', {
@@ -263,13 +271,25 @@
         });
         const data = await res.json();
         
-        // آپدیت موجودی واقعی از سرور
         serverBalance = data.balance;
         document.getElementById('invited-count').textContent = data.invited;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
         
+        // ✅ آپدیت لول و سرعت ماینینگ بر اساس پاسخ سرور
+        if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
+            currentRatePerDay = data.rate_per_day;
+            tokensPerSecond = currentRatePerDay / 86400;
+            document.getElementById('rate-display').textContent = currentRatePerDay;
+            document.getElementById('hour-display').textContent = (currentRatePerDay / 24).toFixed(2);
+        }
+        
+        // نمایش لول در هدر
+        if (data.level) {
+            document.getElementById('user-level').textContent = `Level ${data.level}`;
+        }
+
         if (data.has_paid) {
-            if(document.getElementById('screen-dashboard').classList.contains('active') === false) {
+            if(!document.getElementById('screen-dashboard').classList.contains('active')) {
                 startApp();
             }
         }
@@ -279,13 +299,12 @@
       } catch(e) { console.error(e); return null; }
     }
 
-    // ✅ تابع انیمیشن زنده (حالا هر نیم ثانیه)
     function startLiveAnimation() {
         if (animateInterval) clearInterval(animateInterval);
         animateInterval = setInterval(() => {
-            pendingMined += TOKENS_PER_SECOND * 0.5; // چون هر نیم ثانیه اجرا میشه، نصف ثانیه حساب میشه
+            pendingMined += tokensPerSecond * 0.2; 
             updateUI();
-        }, 500); // ۵۰۰ میلی‌ثانیه
+        }, 200); // هر 0.2 ثانیه
     }
 
     function updateUI() {
@@ -294,7 +313,6 @@
         document.getElementById('ton-value').textContent = `≈ ${(totalDisplay * 0.0001).toFixed(4)} TON`;
     }
 
-    // ✅ تابع بررسی عضویت
     async function checkMembership() {
       const st = document.getElementById('status-join'); 
       const btn = document.getElementById('btn-next-1');
@@ -384,24 +402,20 @@
       startLiveAnimation();
     }
 
-    // ✅ دکمه Claim: صفر کردن شمارنده و اضافه کردن به سرور
     async function claimTokens() {
       if (pendingMined <= 0) return;
       
       const st = document.getElementById('btn-claim');
       st.innerHTML = 'Syncing...';
       
-      // درخواست به سرور برای ثبت موجودی
       const data = await syncUser();
       
       if (data) {
-        // بعد از سینک موفق، شمارنده معلق صفر میشه
         pendingMined = 0;
         updateUI();
         
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         
-        // افکت بصری روی دکمه
         st.innerHTML = '✅ Claimed!';
         setTimeout(() => {
             st.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR';
@@ -429,7 +443,7 @@
 
     function copyRefLink() { navigator.clipboard.writeText(myRefLink); tg.showAlert('Copied!'); }
     function shareRefLink() {
-      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining 100 ZYR/day! 🚀\n\n${myRefLink}`;
+      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn up to 150 ZYR/day! 🚀\n\n${myRefLink}`;
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`);
     }
 
@@ -465,4 +479,4 @@
     syncUser();
   </script>
 </body>
-                                                                                                            </html>
+                                                         </html>
