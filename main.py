@@ -13,7 +13,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
 CHANNEL_ID = "@ZYRMining" 
-TOKENS_PER_SECOND = 100 / 86400  # ۱۰۰ توکن در روز
 # =====================
 
 app = FastAPI()
@@ -85,31 +84,49 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # ✅ شرط ادمین: اگر کاربر ادمین بود، خودکار پرداختش رو تایید کن
+    # ✅ شرط ادمین
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
+    # تعداد دوستان دعوت‌شده
+    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
+    invited_count = c.fetchone()['count']
+    
+    # ✅ محاسبه لول و سرعت ماینینگ بر اساس تعداد دوستان (لول ۱ شد ۸۰)
+    if invited_count >= 20:
+        rate_per_day = 150
+        level = 4
+    elif invited_count >= 10:
+        rate_per_day = 130
+        level = 3
+    elif invited_count >= 5:
+        rate_per_day = 110
+        level = 2
+    else:
+        rate_per_day = 80  # 👈 اینجا از ۹۰ به ۸۰ تغییر کرد
+        level = 1
+    
+    tokens_per_second = rate_per_day / 86400
+    
     # محاسبه سود ماینینگ
     time_diff = time.time() - user['last_mining']
-    earned = time_diff * TOKENS_PER_SECOND
+    earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
     
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
     conn.commit()
     
-    # اطلاعات رفرال
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
-    invited_count = c.fetchone()['count']
-    
     conn.close()
     return {
-        "balance": round(new_balance, 4),
+        "balance": round(new_balance, 5),
         "has_paid": bool(user['has_paid']),
         "invited": invited_count,
-        "referral_earned": round(user['referral_earned'], 2)
+        "referral_earned": round(user['referral_earned'], 2),
+        "rate_per_day": rate_per_day,
+        "level": level
     }
 
 # --- API ثبت پرداخت (تاییدیه) ---
@@ -190,8 +207,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         f"⚡ **Welcome to ZYR Cloud Miner, {user_name}!**\n\n"
         f"⛏️ **Mine ZYR inside the app:** Start your session, claim tokens, and withdraw to TON.\n"
-        f"💎 **Activate your miner:** Deposit 0.1 TON to start earning 100 ZYR daily.\n"
-        f"👥 **Invite friends:** You get 300 ZYR when they activate their miner.\n\n"
+        f"💎 **Activate your miner:** Deposit 0.1 TON to start earning 80 ZYR daily.\n"
+        f"👥 **Invite friends:** Boost your mining rate (up to 150 ZYR/day) and earn 300 ZYR per friend.\n\n"
         f"👇 **Tap below to start!**"
     )
     
