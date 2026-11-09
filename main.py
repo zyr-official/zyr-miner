@@ -4,17 +4,21 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, WebAppInfo
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
 # ====== تنظیمات ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2Ko")
 ADMIN_ID = 1839907139
+# دقت کن آدرس جدید گیت‌هابت (zyr-official) اینجا باشه
+WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
+CHANNEL_ID = "@ZYRMining" 
 # =====================
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# --- دیتابیس ---
 def init_db():
     conn = sqlite3.connect('/tmp/zyr.db')
     c = conn.cursor()
@@ -23,12 +27,30 @@ def init_db():
     conn.close()
 init_db()
 
+# --- مدل‌های داده ---
 class WithdrawRequest(BaseModel):
     user_id: str
     username: str
     amount: float
     address: str
 
+class MemberCheckRequest(BaseModel):
+    user_id: str
+
+# --- API بررسی عضویت در کانال ---
+@app.post("/check-member")
+async def check_member(req: MemberCheckRequest):
+    bot = Bot(token=BOT_TOKEN)
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(req.user_id))
+        if member.status in ['member', 'administrator', 'creator']:
+            return {"isMember": True}
+        else:
+            return {"isMember": False}
+    except Exception as e:
+        return {"isMember": False, "error": str(e)}
+
+# --- API برداشت ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
     conn = sqlite3.connect('/tmp/zyr.db')
@@ -52,16 +74,44 @@ async def request_withdraw(req: WithdrawRequest):
     await bot.send_message(chat_id=ADMIN_ID, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
     return {"ok": True}
 
+# --- فایل تنظیمات کیف پول ---
 @app.get("/tonconnect-manifest.json")
 async def get_manifest():
     return JSONResponse({
-        "url": "https://sinapalani-bot.github.io/zyr-miner/",
+        "url": WEBAPP_URL,
         "name": "ZYR Miner",
-        "iconUrl": "https://sinapalani-bot.github.io/zyr-miner/icon.png"
+        "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
+# --- ربات تلگرام (دستور استارت) ---
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.effective_user.first_name or "Miner"
+    
+    welcome_text = (
+        f"⚡ **Welcome to ZYR Cloud Miner, {user_name}!**\n\n"
+        f"⛏️ **Mine ZYR inside the app:** Start your mining session, come back later to claim your tokens, and request withdrawals directly to your TON wallet.\n\n"
+        f"💎 **Activate your miner:** Deposit 0.1 TON to start your cloud miner and earn 100 ZYR daily.\n\n"
+        f"👥 **Invite friends:** Share your referral link. When they join and activate their miner, you get 300 ZYR instantly.\n\n"
+        f"📈 **Live Dashboard:** Track your mining rate, balance, and progress in real-time.\n\n"
+        f"ℹ️ *ZYR Miner is an independent service.*\n\n"
+        f"👇 **Tap the button below to start!**"
+    )
+    
+    keyboard = [[
+        InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=WEBAPP_URL))
+    ]]
+    
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
+telegram_app.add_handler(CommandHandler("start", start_command))
+
+# --- دکمه‌های تایید/رد ادمین ---
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -75,6 +125,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 telegram_app.add_handler(CallbackQueryHandler(handle_callback))
 
+# --- وب‌هوک تلگرام ---
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
