@@ -212,7 +212,8 @@
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505');
 
-    const BACKEND = 'https://your-backend.onrender.com'; // ⚠️ بعدا لینک رندر رو اینجا بذار
+    // ✅ این خط رو بعداً باید با آدرس دامنه/ساب‌دامین خودت عوض کنی (در ادامه توضیح دادم)
+    const BACKEND = 'https://api.yourdomain.com'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
     
     let tonConnectUI, miningInterval;
@@ -367,4 +368,4 @@
     }
   </script>
 </body>
-        </html>
+  </html>
