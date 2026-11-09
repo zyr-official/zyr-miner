@@ -216,7 +216,7 @@
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
     
     let tonConnectUI, miningInterval;
-    let currentBalance = 0, pendingBalance = 0;
+    let currentBalance = 0;
     const TOKENS_PER_SECOND = 100 / 86400; 
 
     const tgUser = tg.initDataUnsafe?.user || { id: '123456789', first_name: 'ZYR User' };
@@ -224,31 +224,43 @@
     const myRefCode = userId.slice(-6).toUpperCase();
     const myRefLink = `https://t.me/ZYRMiningBot/app?startapp=ref_${myRefCode}`;
 
-    const db = {
-      getUsers: () => JSON.parse(localStorage.getItem('zyr_users') || '{}'),
-      saveUsers: (users) => localStorage.setItem('zyr_users', JSON.stringify(users)),
-      getUser: (id) => {
-        const users = db.getUsers();
-        if (!users[id]) { users[id] = { balance: 0, pending: 0, invited: [], earnedRef: 0, referrer: null }; db.saveUsers(users); }
-        return users[id];
-      },
-      updateUser: (id, data) => { const users = db.getUsers(); users[id] = { ...users[id], ...data }; db.saveUsers(users); }
-    };
-
+    // گرفتن کد رفرال از لینک
+    let referrerId = null;
     const startParam = tg.initDataUnsafe?.start_param || "";
     if (startParam.startsWith('ref_')) {
-      const referrerCode = startParam.replace('ref_', '');
-      const users = db.getUsers();
-      const referrerId = Object.keys(users).find(id => id.slice(-6).toUpperCase() === referrerCode);
-      const currentUser = db.getUser(userId);
-      if (referrerId && referrerId !== userId && !currentUser.referrer) {
-        currentUser.referrer = referrerId; db.updateUser(userId, currentUser);
-        const referrer = db.getUser(referrerId);
-        if (!referrer.invited.includes(userId)) { referrer.invited.push(userId); db.updateUser(referrerId, referrer); }
-      }
+        referrerId = startParam.replace('ref_', '');
     }
 
-    // ✅ بررسی عضویت واقعی
+    // === سینک با سرور ===
+    async function syncUser() {
+      try {
+        const res = await fetch(BACKEND + '/sync-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                user_id: userId, 
+                first_name: tgUser.first_name,
+                referrer_id: referrerId
+            })
+        });
+        const data = await res.json();
+        
+        currentBalance = data.balance;
+        document.getElementById('invited-count').textContent = data.invited;
+        document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
+        
+        // ✅ شرط مهم: اگه پرداخت کرده بود یا ادمین بود، بره داشبورد
+        if (data.has_paid) {
+            startApp();
+        } else {
+            showScreen('screen-pay');
+            initTonConnect();
+        }
+        
+        updateUI();
+      } catch(e) { console.error(e); }
+    }
+
     async function checkMembership() {
       const st = document.getElementById('status-join'); 
       const btn = document.getElementById('btn-next-1');
@@ -267,7 +279,8 @@
         if (data.isMember) {
             st.textContent = '✅ Verified! Proceeding...'; 
             st.className = 'status ok';
-            setTimeout(() => { showScreen('screen-pay'); initTonConnect(); }, 800);
+            // بعد از تایید عضویت، سینک رو صدا می‌زنیم تا ببینیم پرداخت کرده یا نه
+            syncUser(); 
         } else {
             st.textContent = '❌ You must join the channel first.'; 
             st.className = 'status err'; 
@@ -293,15 +306,17 @@
       try {
         const tx = { validUntil: Math.floor(Date.now() / 1000) + 600, messages: [{ address: TON_RECEIVER, amount: '100000000' }] };
         await tonConnectUI.sendTransaction(tx);
-        st.textContent = '⏳ Verifying...'; st.className = 'status ok';
-        await new Promise(r => setTimeout(r, 2000)); 
-        const currentUser = db.getUser(userId);
-        if (currentUser.referrer) {
-          const referrer = db.getUser(currentUser.referrer);
-          referrer.balance += 300; referrer.earnedRef += 300; db.updateUser(currentUser.referrer, referrer);
-          currentUser.referrer = null; db.updateUser(userId, currentUser);
-        }
-        startApp();
+        
+        st.textContent = '⏳ Verifying payment...'; st.className = 'status ok';
+        
+        await fetch(BACKEND + '/confirm-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+
+        await new Promise(r => setTimeout(r, 1000)); 
+        syncUser();
       } catch (e) { st.textContent = '❌ Cancelled.'; st.className = 'status err'; btn.disabled = false; }
     }
 
@@ -315,30 +330,25 @@
         document.getElementById('user-avatar').innerHTML = imgHtml;
         document.getElementById('user-avatar-friends').innerHTML = imgHtml;
       }
-      const user = db.getUser(userId);
-      currentBalance = user.balance;
+      
       document.getElementById('ref-code').textContent = myRefCode;
       document.getElementById('ref-link').textContent = myRefLink;
-      document.getElementById('invited-count').textContent = user.invited.length;
-      document.getElementById('active-count').textContent = `${user.invited.length} active`; 
-      document.getElementById('earned-referral').textContent = `+${user.earnedRef.toFixed(2)}`;
+      
       if (miningInterval) clearInterval(miningInterval);
-      miningInterval = setInterval(() => { pendingBalance += TOKENS_PER_SECOND; updateUI(); }, 1000);
+      
+      // هر ۱۰ ثانیه با سرور سینک میشیم تا موجودی آپدیت بشه
+      miningInterval = setInterval(syncUser, 10000);
     }
 
     function updateUI() {
-      const total = currentBalance + pendingBalance;
-      document.getElementById('main-balance').textContent = total.toFixed(4);
-      document.getElementById('ton-value').textContent = `≈ ${(total * 0.0001).toFixed(4)} TON`;
+      document.getElementById('main-balance').textContent = currentBalance.toFixed(4);
+      document.getElementById('ton-value').textContent = `≈ ${(currentBalance * 0.0001).toFixed(4)} TON`;
     }
 
     function claimTokens() {
-      if (pendingBalance <= 0) return;
-      currentBalance += pendingBalance;
-      const user = db.getUser(userId); user.balance = currentBalance; db.updateUser(userId, user);
+      syncUser();
       if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-      tg.showAlert(`Claimed ${pendingBalance.toFixed(4)} ZYR!`);
-      pendingBalance = 0; updateUI();
+      tg.showAlert(`Balance synced!`);
     }
 
     function showScreen(id) {
@@ -352,8 +362,7 @@
       else if (tab === 'friends') { showScreen('screen-friends'); document.getElementById('nav-friends').classList.add('active'); }
       else if (tab === 'withdraw') {
         showScreen('screen-withdraw'); document.getElementById('nav-withdraw').classList.add('active');
-        const user = db.getUser(userId);
-        document.getElementById('wd-balance').textContent = (currentBalance + pendingBalance).toFixed(4);
+        document.getElementById('wd-balance').textContent = currentBalance.toFixed(4);
         document.getElementById('user-name-wd').textContent = tgUser.first_name;
       }
     }
@@ -368,10 +377,10 @@
       const st = document.getElementById('status-wd');
       const address = document.getElementById('wd-address').value.trim();
       const amount = parseFloat(document.getElementById('wd-amount').value);
+      
       if (!address || address.length < 48) { st.textContent = '❌ Enter a valid TON address.'; st.className = 'status err'; return; }
       if (!amount || amount < 10000) { st.textContent = '❌ Minimum is 10,000 ZYR.'; st.className = 'status err'; return; }
-      const total = currentBalance + pendingBalance;
-      if (amount > total) { st.textContent = '❌ Insufficient balance.'; st.className = 'status err'; return; }
+      if (amount > currentBalance) { st.textContent = '❌ Insufficient balance.'; st.className = 'status err'; return; }
 
       st.textContent = '⏳ Sending request...'; st.className = 'status ok';
 
@@ -382,13 +391,15 @@
       .then(res => { if (!res.ok) throw new Error('Server error'); return res.json(); })
       .then(data => {
         currentBalance -= amount;
-        if (pendingBalance > 0) { if (pendingBalance >= amount) pendingBalance -= amount; else pendingBalance = 0; }
         updateUI(); document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
         showScreen('screen-pending');
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       })
       .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
     }
+
+    // شروع فرآیند
+    syncUser();
   </script>
 </body>
-                                                                                                                                                                                                                                                            </html>
+          </html>
