@@ -38,23 +38,29 @@
     .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px var(--primary); }
     .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%); border: 1px solid var(--border); border-radius: 32px; padding: 32px 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 24px; backdrop-filter: blur(20px); }
     .balance-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-weight: 600; }
-    .balance-amount { font-size: 52px; font-weight: 700; letter-spacing: -2px; display: flex; justify-content: center; align-items: baseline; gap: 8px; }
+    .balance-amount { font-size: 52px; font-weight: 700; letter-spacing: -2px; display: flex; justify-content: center; align-items: baseline; gap: 8px; transition: all 0.2s ease; }
     .balance-amount span { font-size: 20px; color: var(--primary); font-weight: 600; letter-spacing: 0; }
     .balance-ton { font-size: 14px; color: var(--muted); margin-top: 8px; }
+    
     .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; }
     .engine-info { display: flex; flex-direction: column; gap: 4px; }
     .engine-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
-    .engine-status .pulse { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: blink 1.5s infinite; }
+    .engine-status .pulse { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: blink 1s infinite; }
     .engine-rate { font-size: 24px; font-weight: 700; color: var(--text); }
     .engine-rate span { font-size: 14px; color: var(--muted); font-weight: 500; }
-    .circular-progress { width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(var(--primary) 360deg, var(--surface) 0deg); display: flex; align-items: center; justify-content: center; position: relative; }
-    .circular-progress::after { content: '24h'; position: absolute; width: 50px; height: 50px; background: var(--bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--primary); }
+    
+    /* آیکون متحرک جایگزین دایره 24h */
+    .live-icon { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0, 212, 255, 0.1); border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary-glow); }
+    .live-icon svg { width: 24px; height: 24px; fill: var(--primary); animation: pulse-scale 1s infinite alternate; }
+
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
     .stat-header { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 500; }
     .stat-value { font-size: 20px; font-weight: 700; }
+    
     .claim-action { width: 100%; padding: 22px; border: none; border-radius: 20px; background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); border: 1px solid rgba(0,212,255,0.3); color: var(--primary); font-size: 18px; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 24px; }
     .claim-action:active { transform: scale(0.98); background: rgba(0,212,255,0.25); }
+    
     .friends-header { margin-bottom: 24px; }
     .friends-header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
     .friends-header p { color: var(--muted); font-size: 15px; line-height: 1.5; }
@@ -73,13 +79,17 @@
     .stat-box-label { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
     .stat-box-value { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
     .stat-box-sub { font-size: 12px; color: var(--primary); }
+    
     .bottom-nav { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(24px); border: 1px solid var(--border); border-radius: 100px; display: flex; justify-content: space-around; align-items: center; padding: 12px; z-index: 100; }
     .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; }
     .nav-btn.active { color: var(--primary); }
     .nav-btn svg { width: 24px; height: 24px; fill: currentColor; }
     .nav-main { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; display: flex; align-items: center; justify-content: center; transform: translateY(-20px); box-shadow: 0 10px 30px var(--primary-glow); border: 4px solid var(--bg); }
     .nav-main svg { width: 28px; height: 28px; }
+    
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes pulse-scale { from { transform: scale(1); } to { transform: scale(1.1); } }
+    
     #ton-connect-button { display: flex; justify-content: center; margin-bottom: 20px; width: 100%; max-width: 340px; }
   </style>
 </head>
@@ -117,23 +127,33 @@
         </div>
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
+      
       <div class="balance-section">
         <div class="balance-title">Total Mined</div>
         <div class="balance-amount"><span id="main-balance">0.0000</span> <span>ZYR</span></div>
         <div class="balance-ton" id="ton-value">≈ 0.0000 TON</div>
       </div>
+
       <div class="mining-engine">
         <div class="engine-info">
           <div class="engine-status"><div class="pulse"></div> Engine Running</div>
           <div class="engine-rate">+100 <span>ZYR / day</span></div>
         </div>
-        <div class="circular-progress"></div>
+        <!-- آیکون زنده جایگزین دایره 24h -->
+        <div class="live-icon">
+            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
       </div>
+
       <div class="stats">
         <div class="stat-card"><div class="stat-header">Per Hour</div><div class="stat-value">4.16 ZYR</div></div>
         <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
       </div>
-      <button class="claim-action" onclick="claimTokens()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR</button>
+
+      <button class="claim-action" onclick="claimTokens()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 
+        Claim Mined ZYR
+      </button>
     </div>
   </div>
 
@@ -215,8 +235,9 @@
     const BACKEND = 'https://nann.pingooshop.ir'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
     
-    let tonConnectUI, miningInterval;
-    let currentBalance = 0;
+    let tonConnectUI, syncInterval, animateInterval;
+    let serverBalance = 0;
+    let displayBalance = 0;
     const TOKENS_PER_SECOND = 100 / 86400; 
 
     const tgUser = tg.initDataUnsafe?.user || { id: '123456789', first_name: 'ZYR User' };
@@ -224,14 +245,13 @@
     const myRefCode = userId.slice(-6).toUpperCase();
     const myRefLink = `https://t.me/ZYRMiningBot/app?startapp=ref_${myRefCode}`;
 
-    // گرفتن کد رفرال از لینک
     let referrerId = null;
     const startParam = tg.initDataUnsafe?.start_param || "";
     if (startParam.startsWith('ref_')) {
         referrerId = startParam.replace('ref_', '');
     }
 
-    // === سینک با سرور ===
+    // ✅ تابع سینک با سرور
     async function syncUser() {
       try {
         const res = await fetch(BACKEND + '/sync-user', {
@@ -245,22 +265,33 @@
         });
         const data = await res.json();
         
-        currentBalance = data.balance;
+        // آپدیت موجودی واقعی از سرور
+        serverBalance = data.balance;
         document.getElementById('invited-count').textContent = data.invited;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
         
-        // ✅ شرط مهم: اگه پرداخت کرده بود یا ادمین بود، بره داشبورد
         if (data.has_paid) {
-            startApp();
-        } else {
-            showScreen('screen-pay');
-            initTonConnect();
+            if(document.getElementById('screen-dashboard').classList.contains('active') === false) {
+                startApp();
+            }
         }
         
-        updateUI();
-      } catch(e) { console.error(e); }
+        return data;
+      } catch(e) { console.error(e); return null; }
     }
 
+    // ✅ تابع انیمیشن زنده (هر ثانیه)
+    function startLiveAnimation() {
+        if (animateInterval) clearInterval(animateInterval);
+        animateInterval = setInterval(() => {
+            // به جای اینکه فقط صبر کنیم تا سرور آپدیت کنه، خودمون هم روی صفحه اضافه می‌کنیم
+            serverBalance += TOKENS_PER_SECOND; 
+            document.getElementById('main-balance').textContent = serverBalance.toFixed(5); // ۵ رقم اعشار برای دیدن تغییرات
+            document.getElementById('ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
+        }, 1000);
+    }
+
+    // ✅ تابع بررسی عضویت
     async function checkMembership() {
       const st = document.getElementById('status-join'); 
       const btn = document.getElementById('btn-next-1');
@@ -279,8 +310,18 @@
         if (data.isMember) {
             st.textContent = '✅ Verified! Proceeding...'; 
             st.className = 'status ok';
-            // بعد از تایید عضویت، سینک رو صدا می‌زنیم تا ببینیم پرداخت کرده یا نه
-            syncUser(); 
+            
+            const syncData = await syncUser();
+            
+            setTimeout(() => {
+                if (syncData && syncData.has_paid) {
+                    startApp();
+                } else {
+                    showScreen('screen-pay');
+                    initTonConnect();
+                }
+            }, 800);
+
         } else {
             st.textContent = '❌ You must join the channel first.'; 
             st.className = 'status err'; 
@@ -334,21 +375,20 @@
       document.getElementById('ref-code').textContent = myRefCode;
       document.getElementById('ref-link').textContent = myRefLink;
       
-      if (miningInterval) clearInterval(miningInterval);
+      if (syncInterval) clearInterval(syncInterval);
+      // هر ۱۰ ثانیه با سرور سینک میشه تا آمار دقیق باشه
+      syncInterval = setInterval(syncUser, 10000);
       
-      // هر ۱۰ ثانیه با سرور سینک میشیم تا موجودی آپدیت بشه
-      miningInterval = setInterval(syncUser, 10000);
-    }
-
-    function updateUI() {
-      document.getElementById('main-balance').textContent = currentBalance.toFixed(4);
-      document.getElementById('ton-value').textContent = `≈ ${(currentBalance * 0.0001).toFixed(4)} TON`;
+      // انیمیشن زنده اضافه بشه
+      startLiveAnimation();
     }
 
     function claimTokens() {
-      syncUser();
-      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-      tg.showAlert(`Balance synced!`);
+      // وقتی کلیم می‌زنه، یه بار دیگه با سرور سینک میشیم تا موجودی نهایی رو بگیریم
+      syncUser().then(() => {
+          if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+          tg.showAlert(`Balance updated from server!`);
+      });
     }
 
     function showScreen(id) {
@@ -362,7 +402,7 @@
       else if (tab === 'friends') { showScreen('screen-friends'); document.getElementById('nav-friends').classList.add('active'); }
       else if (tab === 'withdraw') {
         showScreen('screen-withdraw'); document.getElementById('nav-withdraw').classList.add('active');
-        document.getElementById('wd-balance').textContent = currentBalance.toFixed(4);
+        document.getElementById('wd-balance').textContent = serverBalance.toFixed(4);
         document.getElementById('user-name-wd').textContent = tgUser.first_name;
       }
     }
@@ -380,7 +420,7 @@
       
       if (!address || address.length < 48) { st.textContent = '❌ Enter a valid TON address.'; st.className = 'status err'; return; }
       if (!amount || amount < 10000) { st.textContent = '❌ Minimum is 10,000 ZYR.'; st.className = 'status err'; return; }
-      if (amount > currentBalance) { st.textContent = '❌ Insufficient balance.'; st.className = 'status err'; return; }
+      if (amount > serverBalance) { st.textContent = '❌ Insufficient balance.'; st.className = 'status err'; return; }
 
       st.textContent = '⏳ Sending request...'; st.className = 'status ok';
 
@@ -390,7 +430,7 @@
       })
       .then(res => { if (!res.ok) throw new Error('Server error'); return res.json(); })
       .then(data => {
-        currentBalance -= amount;
+        serverBalance -= amount;
         updateUI(); document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
         showScreen('screen-pending');
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -398,8 +438,8 @@
       .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
     }
 
-    // شروع فرآیند
+    // اجرای اولیه
     syncUser();
   </script>
 </body>
-          </html>
+  </html>
