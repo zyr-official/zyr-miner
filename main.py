@@ -10,7 +10,6 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes, Comman
 # ====== تنظیمات ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2Ko")
 ADMIN_ID = 1839907139
-# دقت کن آدرس جدید گیت‌هابت (zyr-official) اینجا باشه
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
 CHANNEL_ID = "@ZYRMining" 
 # =====================
@@ -83,7 +82,7 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
-# --- ربات تلگرام (دستور استارت) ---
+# --- ربات تلگرام و وب‌هوک (اصلاح شده) ---
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -111,7 +110,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 telegram_app.add_handler(CommandHandler("start", start_command))
 
-# --- دکمه‌های تایید/رد ادمین ---
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -125,7 +123,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 telegram_app.add_handler(CallbackQueryHandler(handle_callback))
 
-# --- وب‌هوک تلگرام ---
+# ✅ اینجا initialize رو درست اضافه کردیم
+@app.on_event("startup")
+async def on_startup():
+    await telegram_app.initialize()
+    await telegram_app.start()
+
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
