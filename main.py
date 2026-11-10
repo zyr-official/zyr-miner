@@ -8,17 +8,17 @@ from pydantic import BaseModel
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, WebAppInfo
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
-# ====== تنظیمات ======
+# ====== Config ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2Ko")
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining" 
-# =====================
+# ====================
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# --- دیتابیس ---
+# --- Database Setup ---
 def get_db():
     conn = sqlite3.connect('/tmp/zyr.db')
     conn.row_factory = sqlite3.Row
@@ -39,13 +39,17 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, amount REAL, address TEXT, status TEXT)''')
     conn.commit()
     conn.close()
+
 init_db()
 
-# --- مدل‌های داده ---
+# --- Request Models ---
 class UserSyncRequest(BaseModel):
     user_id: str
     first_name: str
     referrer_id: str | None = None
+
+class ClaimRequest(BaseModel):
+    user_id: str
 
 class WithdrawRequest(BaseModel):
     user_id: str
@@ -56,7 +60,7 @@ class WithdrawRequest(BaseModel):
 class MemberCheckRequest(BaseModel):
     user_id: str
 
-# --- API بررسی عضویت در کانال ---
+# --- Channel Membership API ---
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
     bot = Bot(token=BOT_TOKEN)
@@ -68,7 +72,7 @@ async def check_member(req: MemberCheckRequest):
     except Exception as e:
         return {"isMember": False, "error": str(e)}
 
-# --- API سینک کردن کاربر (ورود اولیه) ---
+# --- Sync User API ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     conn = get_db()
@@ -83,7 +87,7 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # ✅ شرط ادمین: اگر آیدی با آیدی ادمین یکی بود، خودکار پرداخت شده حساب میشه
+    # Auto-pay for admin user
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
@@ -107,15 +111,14 @@ async def sync_user(req: UserSyncRequest):
         level = 1
     
     tokens_per_second = rate_per_day / 86400
-    
     time_diff = time.time() - user['last_mining']
     earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
     
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
     conn.commit()
-    
     conn.close()
+
     return {
         "balance": round(new_balance, 5),
         "has_paid": bool(user['has_paid']),
@@ -125,7 +128,34 @@ async def sync_user(req: UserSyncRequest):
         "level": level
     }
 
-# --- API ثبت پرداخت (تاییدیه) ---
+# --- Claim API ---
+@app.post("/claim")
+async def claim_tokens(req: ClaimRequest):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+    user = c.fetchone()
+    
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
+    invited_count = c.fetchone()['count']
+    rate_per_day = 150 if invited_count >= 20 else 130 if invited_count >= 10 else 110 if invited_count >= 5 else 80
+    
+    tokens_per_second = rate_per_day / 86400
+    time_diff = time.time() - user['last_mining']
+    earned = time_diff * tokens_per_second
+    new_balance = user['balance'] + earned
+    
+    c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
+    conn.commit()
+    conn.close()
+
+    return {"ok": True, "balance": round(new_balance, 5)}
+
+# --- Payment Confirmation API ---
 @app.post("/confirm-payment")
 async def confirm_payment(req: MemberCheckRequest):
     conn = get_db()
@@ -135,10 +165,8 @@ async def confirm_payment(req: MemberCheckRequest):
     
     if user and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
-        
         if user['referrer_id']:
             c.execute("UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
-        
         conn.commit()
         conn.close()
         return {"ok": True, "message": "Payment confirmed"}
@@ -146,7 +174,7 @@ async def confirm_payment(req: MemberCheckRequest):
     conn.close()
     return {"ok": False, "message": "Already paid or user not found"}
 
-# --- API برداشت ---
+# --- Withdrawal API ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
     conn = get_db()
@@ -186,7 +214,7 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
-# --- ربات تلگرام ---
+# --- Telegram Bot Engine ---
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
