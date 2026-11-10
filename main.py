@@ -60,6 +60,10 @@ class MemberCheckRequest(BaseModel):
 
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
+    # اگر کاربر ادمین باشد، چک کردن کانال اجباری رد می‌شود
+    if req.user_id == str(ADMIN_ID):
+        return {"isMember": True}
+        
     bot = Bot(token=BOT_TOKEN)
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(req.user_id))
@@ -83,22 +87,29 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
+    # اگر کاربر ادمین باشد، به طور خودکار پرداخت‌شده (has_paid=1) در نظر گرفته می‌شود
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
+    # تفکیک تعداد دعوت‌شده‌ها (کل، فعال و غیرفعال)
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
+
+    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=? AND has_paid=1", (req.user_id,))
+    active_invited = c.fetchone()['count']
+
+    inactive_invited = invited_count - active_invited
     
-    if invited_count >= 20:
+    if active_invited >= 20:
         rate_per_day = 150
         level = 4
-    elif invited_count >= 10:
+    elif active_invited >= 10:
         rate_per_day = 130
         level = 3
-    elif invited_count >= 5:
+    elif active_invited >= 5:
         rate_per_day = 110
         level = 2
     else:
@@ -116,6 +127,8 @@ async def sync_user(req: UserSyncRequest):
         "pending": round(pending_earned, 5),
         "has_paid": bool(user['has_paid']),
         "invited": invited_count,
+        "active_invited": active_invited,
+        "inactive_invited": inactive_invited,
         "referral_earned": round(user['referral_earned'], 2),
         "rate_per_day": rate_per_day,
         "level": level
@@ -132,9 +145,9 @@ async def claim_tokens(req: ClaimRequest):
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
         
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
-    invited_count = c.fetchone()['count']
-    rate_per_day = 150 if invited_count >= 20 else 130 if invited_count >= 10 else 110 if invited_count >= 5 else 80
+    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=? AND has_paid=1", (req.user_id,))
+    active_invited = c.fetchone()['count']
+    rate_per_day = 150 if active_invited >= 20 else 130 if active_invited >= 10 else 110 if active_invited >= 5 else 80
     
     tokens_per_second = rate_per_day / 86400
     time_diff = time.time() - user['last_mining']
@@ -157,6 +170,7 @@ async def confirm_payment(req: MemberCheckRequest):
     if user and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         if user['referrer_id']:
+            # واریز 300 ZYR پاداش به معرف به محض پرداخت 0.1 تون توسط زیرمجموعه
             c.execute("UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
         conn.commit()
         conn.close()
@@ -211,6 +225,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ref_id = None
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
+    
     url = WEBAPP_URL
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
