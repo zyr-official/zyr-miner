@@ -60,7 +60,6 @@ class MemberCheckRequest(BaseModel):
 
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
-    # اگر کاربر ادمین باشد، چک کردن کانال اجباری رد می‌شود
     if req.user_id == str(ADMIN_ID):
         return {"isMember": True}
         
@@ -77,24 +76,30 @@ async def check_member(req: MemberCheckRequest):
 async def sync_user(req: UserSyncRequest):
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
-    user = c.fetchone()
     
-    if not user:
-        c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
-                  (req.user_id, req.first_name, req.referrer_id, time.time()))
+    # بایپس مطلق برای ادمین
+    if req.user_id == str(ADMIN_ID):
+        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+        user = c.fetchone()
+        if not user:
+            c.execute("INSERT INTO users (id, first_name, referrer_id, has_paid, last_mining) VALUES (?, ?, ?, 1, ?)", 
+                      (req.user_id, req.first_name, req.referrer_id, time.time()))
+        else:
+            c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
-    
-    # اگر کاربر ادمین باشد، به طور خودکار پرداخت‌شده (has_paid=1) در نظر گرفته می‌شود
-    if req.user_id == str(ADMIN_ID) and not user['has_paid']:
-        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
-        conn.commit()
+    else:
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
+        
+        if not user:
+            c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
+                      (req.user_id, req.first_name, req.referrer_id, time.time()))
+            conn.commit()
+            c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+            user = c.fetchone()
     
-    # تفکیک تعداد دعوت‌شده‌ها (کل، فعال و غیرفعال)
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
 
@@ -125,7 +130,7 @@ async def sync_user(req: UserSyncRequest):
     return {
         "balance": round(user['balance'], 5),
         "pending": round(pending_earned, 5),
-        "has_paid": bool(user['has_paid']),
+        "has_paid": True if req.user_id == str(ADMIN_ID) else bool(user['has_paid']),
         "invited": invited_count,
         "active_invited": active_invited,
         "inactive_invited": inactive_invited,
@@ -170,7 +175,6 @@ async def confirm_payment(req: MemberCheckRequest):
     if user and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         if user['referrer_id']:
-            # واریز 300 ZYR پاداش به معرف به محض پرداخت 0.1 تون توسط زیرمجموعه
             c.execute("UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
         conn.commit()
         conn.close()
