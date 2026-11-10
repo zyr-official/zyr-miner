@@ -18,7 +18,6 @@ CHANNEL_ID = "@ZYRMining"
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# --- پایگاه داده ---
 def get_db():
     conn = sqlite3.connect('/tmp/zyr.db')
     conn.row_factory = sqlite3.Row
@@ -42,7 +41,6 @@ def init_db():
 
 init_db()
 
-# --- مدل‌های درخواست ---
 class UserSyncRequest(BaseModel):
     user_id: str
     first_name: str
@@ -60,7 +58,6 @@ class WithdrawRequest(BaseModel):
 class MemberCheckRequest(BaseModel):
     user_id: str
 
-# --- بررسی عضویت کانال ---
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
     bot = Bot(token=BOT_TOKEN)
@@ -72,7 +69,6 @@ async def check_member(req: MemberCheckRequest):
     except Exception as e:
         return {"isMember": False, "error": str(e)}
 
-# --- سینک کردن کاربر ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     conn = get_db()
@@ -111,15 +107,14 @@ async def sync_user(req: UserSyncRequest):
     
     tokens_per_second = rate_per_day / 86400
     time_diff = time.time() - user['last_mining']
-    earned = time_diff * tokens_per_second
-    new_balance = user['balance'] + earned
+    pending_earned = time_diff * tokens_per_second
     
-    c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
-    conn.commit()
     conn.close()
 
+    # موجودی اصلی ثابت می‌ماند و فقط مقدار پندینگ برای نمایش ارسال می‌شود
     return {
-        "balance": round(new_balance, 5),
+        "balance": round(user['balance'], 5),
+        "pending": round(pending_earned, 5),
         "has_paid": bool(user['has_paid']),
         "invited": invited_count,
         "referral_earned": round(user['referral_earned'], 2),
@@ -127,7 +122,6 @@ async def sync_user(req: UserSyncRequest):
         "level": level
     }
 
-# --- اندپوینت کلایم ---
 @app.post("/claim")
 async def claim_tokens(req: ClaimRequest):
     conn = get_db()
@@ -148,13 +142,13 @@ async def claim_tokens(req: ClaimRequest):
     earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
     
+    # فقط در هنگام کلایم، موجودی اصلی آپدیت شده و زمان ماینینگ ریست می‌شود
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
     conn.commit()
     conn.close()
 
-    return {"ok": True, "balance": round(new_balance, 5)}
+    return {"ok": True, "balance": round(new_balance, 5), "pending": 0}
 
-# --- تایید پرداخت ۰.۱ تن ---
 @app.post("/confirm-payment")
 async def confirm_payment(req: MemberCheckRequest):
     conn = get_db()
@@ -173,7 +167,6 @@ async def confirm_payment(req: MemberCheckRequest):
     conn.close()
     return {"ok": False, "message": "Already paid or user not found"}
 
-# --- ثبت درخواست برداشت ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
     conn = get_db()
@@ -213,7 +206,6 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
-# --- ربات تلگرام ---
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
