@@ -122,14 +122,14 @@
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
       
-      <!-- موجودی اصلی و ثابت (بالای صفحه) -->
+      <!-- موجودی اصلی و ثابت بالای صفحه (فقط با کلایم تغییر می‌کند) -->
       <div class="balance-section">
         <div class="balance-title">Main Wallet Balance</div>
         <div class="balance-amount"><span id="main-wallet-balance">0.00000</span> <span>ZYR</span></div>
         <div class="balance-ton" id="wallet-ton-value">≈ 0.0000 TON</div>
       </div>
 
-      <!-- بخش متحرک و قابل کلایم (که تند تند بالا می‌رود) -->
+      <!-- بخش متحرک و قابل کلایم (پایین‌تر) -->
       <div class="balance-section" style="background: linear-gradient(145deg, rgba(0,212,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(0,212,255,0.3); margin-bottom: 24px;">
         <div class="balance-title">Claimable Mined ZYR</div>
         <div class="balance-amount" style="font-size: 42px;"><span id="pending-balance">0.00000</span> <span>ZYR</span></div>
@@ -274,7 +274,9 @@
         });
         const data = await res.json();
         
-        serverBalance = data.balance;
+        serverBalance = data.balance; // موجودی اصلی ثابت می‌ماند
+        pendingMined = data.pending;   // مقدار در حال استخراج از سرور گرفته می‌شود
+        
         document.getElementById('invited-count').textContent = data.invited;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
         
@@ -303,13 +305,13 @@
     function startLiveAnimation() {
         if (animateInterval) clearInterval(animateInterval);
         animateInterval = setInterval(() => {
-            pendingMined += tokensPerSecond * 0.2; 
+            pendingMined += tokensPerSecond * 0.2; // فقط باکس پایین (Claimable) زنده بالا می‌رود
             updateUI();
         }, 200); 
     }
 
     function updateUI() {
-        // ۱. موجودی اصلی و ثابت (بالای صفحه)
+        // ۱. موجودی اصلی بالای صفحه مطلقاً ثابت است و خودبه‌خود بالا نمی‌رود
         document.getElementById('main-wallet-balance').textContent = serverBalance.toFixed(5);
         document.getElementById('wallet-ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
 
@@ -411,6 +413,7 @@
       startLiveAnimation();
     }
 
+    // تابع کلایم: مقدار پایین صفر شده و به موجودی بالای صفحه اضافه می‌شود
     async function claimTokens() {
       if (pendingMined <= 0.00001) return;
       const st = document.getElementById('btn-claim');
@@ -424,8 +427,8 @@
         });
         const data = await res.json();
         if (data.ok) {
-            serverBalance = data.balance; // انتقال به موجودی اصلی
-            pendingMined = 0;              // صفر شدن بخش قابل کلایم
+            serverBalance = data.balance; // آپدیت موجودی کل بالای صفحه
+            pendingMined = 0;              // صفر شدن باکس پایین
             updateUI();
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             st.innerHTML = '✅ Claimed!';
@@ -460,7 +463,7 @@
           showScreen('screen-withdraw'); 
           document.getElementById('nav-withdraw').classList.add('active');
           
-          // اتصال موجودی صفحه برداشت مستقیماً به موجودی اصلی و ثابت (بدون جمع شدن با pendingMined)
+          // موجودی صفحه برداشت فقط به موجودی اصلی و ثابت بالای صفحه وصل است
           document.getElementById('wd-balance').textContent = serverBalance.toFixed(4);
           
           document.getElementById('user-name-wd').textContent = tgUser.first_name;
