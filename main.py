@@ -19,6 +19,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppI
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # جلوگیری از چاپ توکن در لاگ
 log = logging.getLogger("zyr")
 
 # ====== تنظیمات (همه از Environment) ======
@@ -178,6 +179,18 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.middleware("http")
+async def catch_all(request: Request, call_next):
+    # خطاهای ۵۰۰ را به JSON تبدیل می‌کند تا با CORS به اپ برسد (به‌جای Failed to fetch)
+    try:
+        return await call_next(request)
+    except Exception as e:
+        log.exception("unhandled error")
+        return JSONResponse({"detail": "Internal error: " + type(e).__name__}, status_code=500)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[WEBAPP_ORIGIN],
