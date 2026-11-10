@@ -286,11 +286,26 @@
         referrerId = startParam.replace('ref_', '');
     }
 
-    // لود اولیه هوشمند بدون معطلی
-    window.addEventListener('DOMContentLoaded', () => {
-        if (userId === ADMIN_ID || localStorage.getItem('zyr_joined_' + userId) === 'true') {
+    window.addEventListener('DOMContentLoaded', async () => {
+        if (userId === ADMIN_ID) {
             syncUser();
-        } else {
+            return;
+        }
+
+        try {
+            const res = await fetch(BACKEND + '/check-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await res.json();
+
+            if (data.isMember) {
+                syncUser();
+            } else {
+                showScreen('screen-join');
+            }
+        } catch (e) {
             showScreen('screen-join');
         }
     });
@@ -338,11 +353,6 @@
       } catch(e) { 
         console.error(e); 
         if (userId === ADMIN_ID) { startApp(); }
-        else {
-            // اگر ارتباط با سرور خطا داشت ولی کاربر عضو شده بود، مستقیم بفرست صفحه پرداخت یا داشبورد
-            showScreen('screen-pay');
-            initTonConnect();
-        }
         return null; 
       }
     }
@@ -371,7 +381,6 @@
       btn.disabled = true;
 
       if (userId === ADMIN_ID) {
-          localStorage.setItem('zyr_joined_' + userId, 'true');
           syncUser();
           return;
       }
@@ -384,32 +393,21 @@
         });
         const data = await res.json();
 
-        // چه ربات تایید کند و چه برای تست در حالت آفلاین/خطا باشد، اجازه عبور داده می‌شود تا کاربر گیر نکند
-        if (data.isMember || data.ok) {
+        if (data.isMember) {
             st.textContent = '✅ Verified! Proceeding...'; 
             st.className = 'status ok';
-            localStorage.setItem('zyr_joined_' + userId, 'true');
-            
             setTimeout(() => {
                 syncUser();
             }, 500);
         } else {
-            // برای اطمینان و رفع باگ قطعی: اگر سرور هم پاسخ نداد ولی کاربر دکمه را زد، ذخیره کرده و هدایت می‌کنیم
-            localStorage.setItem('zyr_joined_' + userId, 'true');
-            st.textContent = '✅ Verified! Proceeding...'; 
-            st.className = 'status ok';
-            setTimeout(() => {
-                syncUser();
-            }, 500);
+            st.textContent = '❌ You must join the channel first.'; 
+            st.className = 'status err'; 
+            btn.disabled = false;
         }
       } catch (e) {
-        // بایپس اضطراری در صورت قطعی اینترنت یا خطا روی گوشی دیگر
-        localStorage.setItem('zyr_joined_' + userId, 'true');
-        st.textContent = '✅ Verified! Proceeding...'; 
-        st.className = 'status ok';
-        setTimeout(() => {
-            syncUser();
-        }, 500);
+        st.textContent = '❌ Error checking membership. Try again.'; 
+        st.className = 'status err'; 
+        btn.disabled = false;
       }
     }
 
@@ -548,7 +546,7 @@
       .then(data => {
         serverBalance -= amount;
         updateUI(); 
-        document.getElementById('pending-appamount-display').textContent = amount.toLocaleString();
+        document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
         showScreen('screen-pending');
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       })
