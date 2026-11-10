@@ -68,6 +68,9 @@ def init_db():
             user_id TEXT, amount REAL, address TEXT, status TEXT)""")
         conn.execute("""CREATE TABLE IF NOT EXISTS payments (
             tx_hash TEXT PRIMARY KEY, user_id TEXT, created REAL)""")
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)")]
+        if "accrued" not in cols:  # مهاجرت دیتابیس قدیمی
+            conn.execute("ALTER TABLE users ADD COLUMN accrued REAL DEFAULT 0")
     conn.close()
 
 
