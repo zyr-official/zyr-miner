@@ -11,7 +11,7 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes, Comman
 # ====== تنظیمات ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2Ko")
 ADMIN_ID = 1839907139
-WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
+WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
 CHANNEL_ID = "@ZYRMining" 
 # =====================
 
@@ -111,7 +111,6 @@ async def sync_user(req: UserSyncRequest):
     
     conn.close()
 
-    # موجودی اصلی ثابت می‌ماند و فقط مقدار پندینگ برای نمایش ارسال می‌شود
     return {
         "balance": round(user['balance'], 5),
         "pending": round(pending_earned, 5),
@@ -142,7 +141,6 @@ async def claim_tokens(req: ClaimRequest):
     earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
     
-    # فقط در هنگام کلایم، موجودی اصلی آپدیت شده و زمان ماینینگ ریست می‌شود
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
     conn.commit()
     conn.close()
