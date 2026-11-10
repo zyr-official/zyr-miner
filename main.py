@@ -95,7 +95,7 @@ async def sync_user(req: UserSyncRequest):
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
     
-    # ✅ محاسبه لول و سرعت ماینینگ بر اساس تعداد دوستان (لول ۱ شد ۸۰)
+    # ✅ محاسبه لول و سرعت ماینینگ
     if invited_count >= 20:
         rate_per_day = 150
         level = 4
@@ -106,12 +106,13 @@ async def sync_user(req: UserSyncRequest):
         rate_per_day = 110
         level = 2
     else:
-        rate_per_day = 80  # 👈 اینجا از ۹۰ به ۸۰ تغییر کرد
+        rate_per_day = 80  # لول ۱
         level = 1
     
     tokens_per_second = rate_per_day / 86400
     
-    # محاسبه سود ماینینگ
+    # ⚠️ باگ قبلی: زمان آخرین ماینینگ با سرعت جدید محاسبه نمیشد.
+    # حالا زمان رو می‌گیریم و با سرعت جدید حساب می‌کنیم
     time_diff = time.time() - user['last_mining']
     earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
