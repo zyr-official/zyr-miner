@@ -184,8 +184,16 @@
         <div class="ref-link" id="ref-link">https://t.me/...</div>
       </div>
       <div class="stats-grid">
-        <div class="stat-box"><div class="stat-box-label">Invited</div><div class="stat-box-value" id="invited-count">0</div><div class="stat-box-sub" id="active-count">0 active</div></div>
-        <div class="stat-box"><div class="stat-box-label">Earned</div><div class="stat-box-value" style="color: var(--primary);" id="earned-referral">+0.00</div><div class="stat-box-sub" style="color: var(--muted);">ZYR earned</div></div>
+        <div class="stat-box">
+          <div class="stat-box-label">Active (Paid)</div>
+          <div class="stat-box-value" style="color: #2ecc71;" id="active-count">0</div>
+          <div class="stat-box-sub" style="color: #2ecc71;">Active (Green)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-label">Pending</div>
+          <div class="stat-box-value" style="color: #e67e22;" id="inactive-count">0</div>
+          <div class="stat-box-sub" style="color: #e67e22;">Not paid (Orange)</div>
+        </div>
       </div>
     </div>
   </div>
@@ -269,8 +277,8 @@
     const userId = tgUser.id.toString();
     const myRefCode = userId;
     
-    // لینک دعوت با آیدی کاملاً صحیح و استاندارد ZYRMining_bot
-    const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
+    // لینک دعوت استاندارد ربات که دستور start=ref_ را ارسال می‌کند
+    const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
 
     let referrerId = null;
     const startParam = tg.initDataUnsafe?.start_param || "";
@@ -294,7 +302,8 @@
         serverBalance = data.balance; 
         pendingMined = data.pending;   
         
-        document.getElementById('invited-count').textContent = data.invited;
+        document.getElementById('active-count').textContent = data.active_invited;
+        document.getElementById('inactive-count').textContent = data.inactive_invited;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
         
         if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
