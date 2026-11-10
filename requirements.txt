@@ -2,3 +2,5 @@ fastapi
 uvicorn
 python-telegram-bot
 pydantic
+httpx
+
