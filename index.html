@@ -286,12 +286,31 @@
         referrerId = startParam.replace('ref_', '');
     }
 
-    // لود اولیه با اطمینان کامل از عدم فریز شدن صفحه
-    window.addEventListener('DOMContentLoaded', () => {
+    // لود اولیه: بررسی زنده عضویت؛ اگر عضو باشد مستقیماً می‌رود صفحه اصلی، اگر نباشد صفحه Join را می‌آورد
+    window.addEventListener('DOMContentLoaded', async () => {
+        if (userId === ADMIN_ID) {
+            syncUser();
+            return;
+        }
+
         try {
-            showScreen('screen-join');
+            const res = await fetch(BACKEND + '/check-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await res.json();
+
+            if (data.isMember) {
+                // اگر کاربر از قبل عضو بود، مستقیم برود سراغ همگام‌سازی و ورود به داشبورد/پرداخت
+                syncUser();
+            } else {
+                // اگر عضو نبود، صفحه جوین نمایش داده شود
+                showScreen('screen-join');
+            }
         } catch (e) {
-            console.error(e);
+            // در صورت خطای شبکه، به صورت پیش‌فرض صفحه جوین نمایش داده شود
+            showScreen('screen-join');
         }
     });
 
