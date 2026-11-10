@@ -94,11 +94,19 @@ async def sync_user(req: UserSyncRequest):
         user = c.fetchone()
         
         if not user:
+            ref_id = req.referrer_id if req.referrer_id != req.user_id else None
             c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
-                      (req.user_id, req.first_name, req.referrer_id, time.time()))
+                      (req.user_id, req.first_name, ref_id, time.time()))
             conn.commit()
             c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
             user = c.fetchone()
+        else:
+            # اگر کاربر از قبل بود ولی معرف نداشت و حالا با لینک معرف آمده است
+            if not user['referrer_id'] and req.referrer_id and req.referrer_id != req.user_id:
+                c.execute("UPDATE users SET referrer_id=? WHERE id=?", (req.referrer_id, req.user_id))
+                conn.commit()
+                c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+                user = c.fetchone()
     
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
