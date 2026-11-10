@@ -4,20 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <title>ZYR Miner</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; font-family: 'Space Grotesk', sans-serif; }
-    :root { --bg: #050505; --surface: rgba(255, 255, 255, 0.03); --surface-hover: rgba(255, 255, 255, 0.08); --primary: #00d4ff; --primary-glow: rgba(0, 212, 255, 0.4); --secondary: #7b2fff; --text: #ffffff; --muted: #888888; --border: rgba(255, 255, 255, 0.08); }
-    body { background-color: var(--bg); background-image: radial-gradient(circle at 15% 15%, rgba(123, 47, 255, 0.15) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(0, 212, 255, 0.1) 0%, transparent 40%); background-attachment: fixed; color: var(--text); min-height: 100vh; padding-bottom: 110px; overflow-x: hidden; }
+    
+    :root {
+      --bg: #050505;
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-hover: rgba(255, 255, 255, 0.08);
+      --primary: #00d4ff;
+      --primary-glow: rgba(0, 212, 255, 0.4);
+      --secondary: #7b2fff;
+      --text: #ffffff;
+      --muted: #888888;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(123, 47, 255, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(0, 212, 255, 0.1) 0%, transparent 40%);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 110px;
+      overflow-x: hidden;
+    }
+
     .screen { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
     .screen.active { display: block; }
     @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ====== ONBOARDING ====== */
     .onboarding { padding: 40px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; }
     .onboarding .icon-box { width: 90px; height: 90px; border-radius: 30px; background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,47,255,0.2)); border: 1px solid rgba(0,212,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 24px; box-shadow: 0 0 40px rgba(0,212,255,0.15); }
     .onboarding h1 { font-size: 28px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.5px; }
     .onboarding p { color: var(--muted); font-size: 15px; margin-bottom: 32px; line-height: 1.6; max-width: 300px; }
+    
     .btn { width: 100%; max-width: 340px; padding: 18px; border: none; border-radius: 100px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; }
     .btn-primary { background: var(--primary); color: #000; box-shadow: 0 8px 30px var(--primary-glow); }
     .btn-primary:active { transform: scale(0.96); }
@@ -27,6 +53,8 @@
     .status { font-size: 13px; margin-top: 20px; min-height: 20px; font-weight: 500; }
     .status.ok { color: var(--primary); }
     .status.err { color: #ff4757; }
+
+    /* ====== DASHBOARD ====== */
     .app { padding: 24px 20px; }
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
     .profile { display: flex; align-items: center; gap: 12px; }
@@ -36,29 +64,49 @@
     .profile-name p { font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.5px; }
     .badge { background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.2); padding: 8px 16px; border-radius: 100px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--primary); }
     .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px var(--primary); animation: blink 1s infinite; }
-    .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 36px; padding: 40px 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 24px; backdrop-filter: blur(30px); box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); }
+
+    /* کارت موجودی (شیشه‌ای) */
+    .balance-section { 
+      background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); 
+      border: 1px solid rgba(255, 255, 255, 0.1); 
+      border-radius: 36px; padding: 40px 24px; text-align: center; 
+      position: relative; overflow: hidden; margin-bottom: 24px; backdrop-filter: blur(30px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
     .balance-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 12px; font-weight: 600; }
-    .balance-amount { font-size: 56px; font-weight: 700; letter-spacing: -2.5px; display: flex; justify-content: center; align-items: baseline; gap: 8px; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
+    .balance-amount { font-size: 56px; font-weight: 700; letter-spacing: -2.5px; display: flex; justify-content: center; align-items: baseline; gap: 8px; transition: all 0.1s ease; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
     .balance-amount span { font-size: 22px; color: var(--primary); font-weight: 700; letter-spacing: 0; }
-    .balance-amount #main-balance { font-size: 48px; color: var(--text); letter-spacing: -2px; }
     .balance-ton { font-size: 15px; color: var(--muted); margin-top: 12px; font-weight: 500; }
-    .pending-line { margin-top: 20px; padding: 12px 16px; border-radius: 16px; background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.25); font-size: 14px; color: var(--muted); font-weight: 600; }
-    .pending-line b { color: var(--primary); font-size: 18px; font-variant-numeric: tabular-nums; }
+
+    /* موتور ماینینگ */
     .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); }
     .engine-info { display: flex; flex-direction: column; gap: 6px; }
     .engine-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
     .engine-status .pulse { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: blink 0.8s infinite; }
     .engine-rate { font-size: 26px; font-weight: 700; color: var(--text); }
     .engine-rate span { font-size: 14px; color: var(--muted); font-weight: 500; }
+    
     .live-icon { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0, 212, 255, 0.1); border: 2px solid var(--primary); box-shadow: 0 0 25px var(--primary-glow); }
     .live-icon svg { width: 26px; height: 26px; fill: var(--primary); animation: pulse-scale 0.8s infinite alternate; }
+
+    /* آمار */
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px; backdrop-filter: blur(10px); }
     .stat-header { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
     .stat-value { font-size: 22px; font-weight: 700; }
-    .claim-action { width: 100%; padding: 24px; border: 1px solid rgba(0,212,255,0.4); border-radius: 24px; background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); color: var(--primary); font-size: 18px; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.1); }
+
+    /* دکمه Claim */
+    .claim-action { 
+      width: 100%; padding: 24px; border: none; border-radius: 24px; 
+      background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); 
+      border: 1px solid rgba(0,212,255,0.4); color: var(--primary); 
+      font-size: 18px; font-weight: 700; cursor: pointer; transition: 0.3s; 
+      display: flex; align-items: center; justify-content: center; gap: 12px; 
+      box-shadow: 0 0 30px rgba(0,212,255,0.1);
+    }
     .claim-action:active { transform: scale(0.97); background: rgba(0,212,255,0.25); box-shadow: 0 0 40px rgba(0,212,255,0.3); }
-    .claim-action:disabled { opacity: 0.5; }
+
+    /* ====== FRIENDS ====== */
     .friends-header { margin-bottom: 24px; }
     .friends-header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
     .friends-header p { color: var(--muted); font-size: 15px; line-height: 1.5; }
@@ -68,30 +116,37 @@
     .action-btn:active { background: var(--surface-hover); }
     .ref-box { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px; margin-bottom: 20px; backdrop-filter: blur(10px); }
     .ref-label { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 500; }
-    .ref-code-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 8px; }
-    .ref-code { font-size: 22px; font-weight: 700; letter-spacing: 1px; color: var(--text); }
-    .ref-badge { background: rgba(0,212,255,0.1); color: var(--primary); border: 1px solid rgba(0,212,255,0.3); padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .ref-code-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .ref-code { font-size: 28px; font-weight: 700; letter-spacing: 1px; color: var(--text); }
+    .ref-badge { background: rgba(0,212,255,0.1); color: var(--primary); border: 1px solid rgba(0,212,255,0.3); padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 600; }
     .ref-link { background: rgba(0,0,0,0.4); padding: 16px; border-radius: 14px; font-size: 13px; color: var(--primary); word-break: break-all; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; backdrop-filter: blur(10px); }
     .stat-box-label { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
     .stat-box-value { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
     .stat-box-sub { font-size: 12px; color: var(--primary); font-weight: 600; }
+
+    /* ====== WITHDRAW ====== */
     .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 18px; color: #fff; font-family: monospace; font-size: 15px; margin-bottom: 20px; outline: none; transition: 0.3s; }
     .input-field:focus { border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
+
+    /* ====== BOTTOM NAV (بدون Exchange) ====== */
     .bottom-nav { position: fixed; bottom: 24px; left: 24px; right: 24px; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 100px; display: flex; justify-content: space-around; align-items: center; padding: 14px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
     .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; width: 60px; }
     .nav-btn.active { color: var(--primary); }
     .nav-btn svg { width: 24px; height: 24px; fill: currentColor; }
     .nav-main { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; display: flex; align-items: center; justify-content: center; transform: translateY(-24px); box-shadow: 0 10px 30px var(--primary-glow); border: 4px solid var(--bg); }
     .nav-main svg { width: 30px; height: 30px; }
+    
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     @keyframes pulse-scale { from { transform: scale(1); } to { transform: scale(1.15); } }
+    
     #ton-connect-button { display: flex; justify-content: center; margin-bottom: 20px; width: 100%; max-width: 340px; }
   </style>
 </head>
 <body>
 
+  <!-- JOIN SCREEN -->
   <div class="screen active" id="screen-join">
     <div class="onboarding">
       <div class="icon-box">⚡</div>
@@ -103,6 +158,7 @@
     </div>
   </div>
 
+  <!-- PAY SCREEN -->
   <div class="screen" id="screen-pay">
     <div class="onboarding">
       <div class="icon-box" style="background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,212,255,0.05)); border-color: rgba(0,212,255,0.4); color: var(--primary);">💎</div>
@@ -115,6 +171,7 @@
     </div>
   </div>
 
+  <!-- DASHBOARD SCREEN -->
   <div class="screen" id="screen-dashboard">
     <div class="app">
       <div class="top-bar">
@@ -124,27 +181,36 @@
         </div>
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
+      
       <div class="balance-section">
-        <div class="balance-title">Balance</div>
+        <div class="balance-title">Total Mined</div>
         <div class="balance-amount"><span id="main-balance">0.00000</span> <span>ZYR</span></div>
         <div class="balance-ton" id="ton-value">≈ 0.0000 TON</div>
-        <div class="pending-line">⛏️ Unclaimed: <b id="pending-display">0.00000</b> ZYR</div>
       </div>
+
       <div class="mining-engine">
         <div class="engine-info">
           <div class="engine-status"><div class="pulse"></div> Engine Running</div>
           <div class="engine-rate">+<span id="rate-display">80</span> <span>ZYR / day</span></div>
         </div>
-        <div class="live-icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <div class="live-icon">
+            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
       </div>
+
       <div class="stats">
         <div class="stat-card"><div class="stat-header">Per Hour</div><div class="stat-value"><span id="hour-display">3.33</span> ZYR</div></div>
-        <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value" id="boost-display">x1.0</div></div>
+        <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
       </div>
-      <button class="claim-action" id="btn-claim" onclick="claimTokens()"></button>
+
+      <button class="claim-action" id="btn-claim" onclick="claimTokens()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 
+        Claim Mined ZYR
+      </button>
     </div>
   </div>
 
+  <!-- FRIENDS SCREEN -->
   <div class="screen" id="screen-friends">
     <div class="app">
       <div class="top-bar">
@@ -154,21 +220,23 @@
         </div>
         <div class="badge" style="font-size: 14px;">🇬🇧 EN</div>
       </div>
-      <div class="friends-header"><h1>Friends</h1><p>Invite friends and earn 300 ZYR when they activate their miner. More active friends = higher mining rate!</p></div>
+      <div class="friends-header"><h1>Friends</h1><p>Invite friends and earn 300 ZYR when they activate their miner. More friends = higher mining rate!</p></div>
+      
       <div class="info-box">
-        <strong>Boost Levels (active friends):</strong><br>
+        <strong>Boost Levels:</strong><br>
         Level 1 (0 friends): 80 ZYR/day<br>
         Level 2 (5 friends): 110 ZYR/day<br>
         Level 3 (10 friends): 130 ZYR/day<br>
         Level 4 (20 friends): 150 ZYR/day
       </div>
+
       <div class="action-row">
         <button class="action-btn" onclick="copyRefLink()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button>
         <button class="action-btn" onclick="shareRefLink()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share</button>
       </div>
       <div class="ref-box">
         <div class="ref-label">Your referral code</div>
-        <div class="ref-code-row"><div class="ref-code" id="ref-code">LOADING...</div><div class="ref-badge">300 ZYR per friend</div></div>
+        <div class="ref-code-row"><div class="ref-code" id="ref-code">LOADING...</div><div class="ref-badge">300 ZYR per claim</div></div>
         <div class="ref-link" id="ref-link">https://t.me/...</div>
       </div>
       <div class="stats-grid">
@@ -178,6 +246,7 @@
     </div>
   </div>
 
+  <!-- WITHDRAW SCREEN -->
   <div class="screen" id="screen-withdraw">
     <div class="app">
       <div class="top-bar">
@@ -187,10 +256,10 @@
         </div>
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
-      <div class="friends-header" style="margin-top: 20px;"><h1>Withdraw ZYR</h1><p>Convert your claimed ZYR tokens to TON. Claim your mined tokens first.</p></div>
+      <div class="friends-header" style="margin-top: 20px;"><h1>Withdraw ZYR</h1><p>Convert your mined ZYR tokens to TON.</p></div>
       <div class="balance-section" style="padding: 24px; margin-bottom: 24px;">
         <div class="balance-title">Available to Withdraw</div>
-        <div class="balance-amount" style="font-size: 38px;"><span id="wd-balance" style="font-size: 38px; color: var(--text);">0.0000</span> <span>ZYR</span></div>
+        <div class="balance-amount" style="font-size: 38px;"><span id="wd-balance">0.0000</span> <span>ZYR</span></div>
         <div class="balance-ton">Minimum: 10,000 ZYR</div>
       </div>
       <div class="ref-box">
@@ -198,12 +267,13 @@
         <input type="text" id="wd-address" class="input-field" placeholder="UQ...">
         <div class="ref-label">Amount (ZYR)</div>
         <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
-        <button class="btn btn-primary" id="btn-wd" onclick="requestWithdraw()" style="max-width: 100%;">Request Withdrawal</button>
+        <button class="btn btn-primary" onclick="requestWithdraw()" style="max-width: 100%;">Request Withdrawal</button>
         <div class="status" id="status-wd" style="text-align: center;"></div>
       </div>
     </div>
   </div>
 
+  <!-- PENDING SCREEN -->
   <div class="screen" id="screen-pending">
     <div class="onboarding">
       <div class="icon-box" style="background: rgba(255, 193, 7, 0.1); border-color: rgba(255, 193, 7, 0.3); color: #ffc107;">⏳</div>
@@ -214,18 +284,22 @@
     </div>
   </div>
 
+  <!-- BOTTOM NAV (فقط 4 دکمه) -->
   <div class="bottom-nav" id="main-nav" style="display: none;">
     <div class="nav-btn active" id="nav-mining" onclick="switchTab('mining')">
-      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Mining
+      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> 
+      Mining
     </div>
     <div class="nav-btn" id="nav-friends" onclick="switchTab('friends')">
-      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> Friends
+      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> 
+      Friends
     </div>
     <div class="nav-main">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
     </div>
     <div class="nav-btn" id="nav-withdraw" onclick="switchTab('withdraw')">
-      <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg> Withdraw
+      <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg> 
+      Withdraw
     </div>
   </div>
 
@@ -233,103 +307,118 @@
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505');
 
-    const BACKEND = 'https://nann.pingooshop.ir';
+    const BACKEND = 'https://nann.pingooshop.ir'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
-    const CLAIM_HTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR';
-
+    
     let tonConnectUI, syncInterval, animateInterval;
-    let serverBalance = 0;   // موجودی کلیم‌شده (از سرور)
-    let pendingMined = 0;    // ماین‌شده‌ی کلیم‌نشده (شمارنده زنده)
+    let serverBalance = 0;
+    let pendingMined = 0;
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
-    let claiming = false;
-    let lastSyncError = '';
 
-    const tgUser = tg.initDataUnsafe?.user || { id: 0, first_name: 'ZYR User' };
-    const userId = String(tgUser.id);
-    const myRefLink = `https://t.me/ZYRMiningBot/app?startapp=ref_${userId}`;
+    const tgUser = tg.initDataUnsafe?.user || { id: '123456789', first_name: 'ZYR User' };
+    const userId = tgUser.id.toString();
+    const myRefCode = userId.slice(-6).toUpperCase();
+    const myRefLink = `https://t.me/ZYRMiningBot/app?startapp=ref_${myRefCode}`;
 
-    // رفرر: از start_param یا از ?ref= (وقتی از دکمه ربات باز می‌شود)
     let referrerId = null;
-    const sp = tg.initDataUnsafe?.start_param || '';
-    if (sp.startsWith('ref_')) referrerId = sp.slice(4);
-    else referrerId = new URLSearchParams(location.search).get('ref');
-    if (referrerId && !/^\d+$/.test(referrerId)) referrerId = null;
-
-    async function api(path, body = {}) {
-      const res = await fetch(BACKEND + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ init_data: tg.initData, ...body })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || 'Server error');
-      return data;
-    }
-
-    function applyState(d) {
-      serverBalance = d.balance;
-      pendingMined = d.pending;
-      if (d.rate_per_day !== currentRatePerDay) {
-        currentRatePerDay = d.rate_per_day;
-        tokensPerSecond = currentRatePerDay / 86400;
-      }
-      document.getElementById('rate-display').textContent = currentRatePerDay;
-      document.getElementById('hour-display').textContent = (currentRatePerDay / 24).toFixed(2);
-      document.getElementById('boost-display').textContent = 'x' + (currentRatePerDay / 80).toFixed(1);
-      document.getElementById('user-level').textContent = `Level ${d.level}`;
-      document.getElementById('invited-count').textContent = d.invited;
-      document.getElementById('active-count').textContent = `${d.active} active`;
-      document.getElementById('earned-referral').textContent = `+${d.referral_earned}`;
-      updateUI();
+    const startParam = tg.initDataUnsafe?.start_param || "";
+    if (startParam.startsWith('ref_')) {
+        referrerId = startParam.replace('ref_', '');
     }
 
     async function syncUser() {
       try {
-        const d = await api('/sync-user', { ref: referrerId });
-        if (!claiming) applyState(d);
-        if (d.has_paid && !document.getElementById('screen-dashboard').classList.contains('active')
-            && !document.getElementById('main-nav').offsetParent) startApp();
-        return d;
-      } catch (e) { console.error(e); lastSyncError = e.message || 'Network error'; return null; }
+        const res = await fetch(BACKEND + '/sync-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                user_id: userId, 
+                first_name: tgUser.first_name,
+                referrer_id: referrerId
+            })
+        });
+        const data = await res.json();
+        
+        serverBalance = data.balance;
+        document.getElementById('invited-count').textContent = data.invited;
+        document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
+        
+        if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
+            currentRatePerDay = data.rate_per_day;
+            tokensPerSecond = currentRatePerDay / 86400;
+            document.getElementById('rate-display').textContent = currentRatePerDay;
+            document.getElementById('hour-display').textContent = (currentRatePerDay / 24).toFixed(2);
+        }
+        
+        if (data.level) {
+            document.getElementById('user-level').textContent = `Level ${data.level}`;
+        }
+
+        if (data.has_paid) {
+            if(!document.getElementById('screen-dashboard').classList.contains('active')) {
+                startApp();
+            }
+        }
+        
+        updateUI();
+        return data;
+      } catch(e) { console.error(e); return null; }
     }
 
     function startLiveAnimation() {
-      if (animateInterval) clearInterval(animateInterval);
-      animateInterval = setInterval(() => {
-        if (claiming) return;
-        pendingMined += tokensPerSecond * 0.2;
-        updateUI();
-      }, 200);
+        if (animateInterval) clearInterval(animateInterval);
+        animateInterval = setInterval(() => {
+            pendingMined += tokensPerSecond * 0.2; 
+            updateUI();
+        }, 200); 
     }
 
     function updateUI() {
-      document.getElementById('main-balance').textContent = serverBalance.toFixed(5);
-      document.getElementById('pending-display').textContent = pendingMined.toFixed(5);
-      document.getElementById('ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
-      const wd = document.getElementById('wd-balance');
-      if (wd) wd.textContent = serverBalance.toFixed(4);
+        const totalDisplay = serverBalance + pendingMined;
+        document.getElementById('main-balance').textContent = totalDisplay.toFixed(5);
+        document.getElementById('ton-value').textContent = `≈ ${(totalDisplay * 0.0001).toFixed(4)} TON`;
     }
 
     async function checkMembership() {
-      const st = document.getElementById('status-join');
+      const st = document.getElementById('status-join'); 
       const btn = document.getElementById('btn-next-1');
-      st.textContent = 'Checking membership...'; st.className = 'status'; btn.disabled = true;
+      st.textContent = 'Checking membership...'; 
+      st.className = 'status'; 
+      btn.disabled = true;
+
       try {
-        const data = await api('/check-member');
+        const res = await fetch(BACKEND + '/check-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+
         if (data.isMember) {
-          st.textContent = '✅ Verified! Proceeding...'; st.className = 'status ok';
-          const s = await syncUser();
-          if (!s) { st.textContent = '❌ Server error: ' + lastSyncError; st.className = 'status err'; btn.disabled = false; return; }
-          setTimeout(() => {
-            if (s && s.has_paid) startApp();
-            else { showScreen('screen-pay'); initTonConnect(); }
-          }, 800);
+            st.textContent = '✅ Verified! Proceeding...'; 
+            st.className = 'status ok';
+            
+            const syncData = await syncUser();
+            
+            setTimeout(() => {
+                if (syncData && syncData.has_paid) {
+                    startApp();
+                } else {
+                    showScreen('screen-pay');
+                    initTonConnect();
+                }
+            }, 800);
+
         } else {
-          st.textContent = data.error ? ('❌ Bot error: ' + data.error) : '❌ You must join the channel first.'; st.className = 'status err'; btn.disabled = false;
+            st.textContent = '❌ You must join the channel first.'; 
+            st.className = 'status err'; 
+            btn.disabled = false;
         }
       } catch (e) {
-        st.textContent = '❌ ' + (e.message || 'Error checking membership.'); st.className = 'status err'; btn.disabled = false;
+        st.textContent = '❌ Error checking membership.'; 
+        st.className = 'status err'; 
+        btn.disabled = false;
       }
     }
 
@@ -339,75 +428,67 @@
       tonConnectUI.onStatusChange(wallet => { document.getElementById('btn-pay').disabled = !wallet; });
     }
 
-    // ساخت BOC ساده‌ی کامنت متنی (برای شناسایی پرداخت کاربر روی بلاکچین)
-    function commentPayload(text) {
-      const t = new TextEncoder().encode(text);
-      const n = 4 + t.length;                       // 32 بیت صفر + متن
-      const cell = new Uint8Array(2 + n);
-      cell[0] = 0; cell[1] = n * 2; cell.set(t, 6);
-      const boc = new Uint8Array(11 + cell.length);
-      boc.set([0xb5, 0xee, 0x9c, 0x72, 0x01, 0x01, 0x01, 0x01, 0x00, cell.length, 0x00]);
-      boc.set(cell, 11);
-      let s = ''; boc.forEach(b => s += String.fromCharCode(b));
-      return btoa(s);
-    }
-
     async function payTON() {
       if (!tonConnectUI?.account) return;
       const st = document.getElementById('status-pay'); const btn = document.getElementById('btn-pay');
       st.textContent = 'Confirm in wallet...'; st.className = 'status'; btn.disabled = true;
       try {
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 600,
-          messages: [{ address: TON_RECEIVER, amount: '100000000', payload: commentPayload('ZYR:' + userId) }]
+        const tx = { validUntil: Math.floor(Date.now() / 1000) + 600, messages: [{ address: TON_RECEIVER, amount: '100000000' }] };
+        await tonConnectUI.sendTransaction(tx);
+        
+        st.textContent = '⏳ Verifying payment...'; st.className = 'status ok';
+        
+        await fetch(BACKEND + '/confirm-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
         });
-      } catch (e) { st.textContent = '❌ Cancelled.'; st.className = 'status err'; btn.disabled = false; return; }
 
-      st.textContent = '⏳ Verifying payment on blockchain...'; st.className = 'status ok';
-      for (let i = 0; i < 30; i++) {            // تا ~۲.۵ دقیقه
-        await new Promise(r => setTimeout(r, 5000));
-        try {
-          const r = await api('/confirm-payment');
-          if (r.ok) { await syncUser(); startApp(); return; }
-          if (r.message) { st.textContent = '❌ ' + r.message; st.className = 'status err'; return; }
-        } catch (e) { console.error(e); }
-      }
-      st.textContent = '⚠️ Payment not found yet. Reopen the app in a minute.'; st.className = 'status err'; btn.disabled = false;
+        await new Promise(r => setTimeout(r, 1000)); 
+        syncUser();
+      } catch (e) { st.textContent = '❌ Cancelled.'; st.className = 'status err'; btn.disabled = false; }
     }
 
     function startApp() {
       showScreen('screen-dashboard');
       document.getElementById('main-nav').style.display = 'flex';
-      ['user-name', 'user-name-friends', 'user-name-wd'].forEach(id => document.getElementById(id).textContent = tgUser.first_name);
+      document.getElementById('user-name').textContent = tgUser.first_name;
+      document.getElementById('user-name-friends').textContent = tgUser.first_name;
       if (tgUser.photo_url) {
         const imgHtml = `<img src="${tgUser.photo_url}">`;
-        ['user-avatar', 'user-avatar-friends', 'user-avatar-wd'].forEach(id => document.getElementById(id).innerHTML = imgHtml);
+        document.getElementById('user-avatar').innerHTML = imgHtml;
+        document.getElementById('user-avatar-friends').innerHTML = imgHtml;
       }
-      document.getElementById('ref-code').textContent = userId;
+      
+      document.getElementById('ref-code').textContent = myRefCode;
       document.getElementById('ref-link').textContent = myRefLink;
-      document.getElementById('btn-claim').innerHTML = CLAIM_HTML;
-
+      
       if (syncInterval) clearInterval(syncInterval);
       syncInterval = setInterval(syncUser, 10000);
+      
       startLiveAnimation();
     }
 
-    // کلیم: شمارنده‌ی زنده صفر می‌شود و به موجودی اضافه می‌شود
     async function claimTokens() {
-      if (claiming || pendingMined < 0.00001) return;
-      const btn = document.getElementById('btn-claim');
-      claiming = true; btn.disabled = true; btn.textContent = 'Claiming...';
-      try {
-        const d = await api('/claim');
-        applyState(d);                         // balance جدید، pending ≈ 0
-        pendingMined = 0; updateUI();
+      if (pendingMined <= 0) return;
+      
+      const st = document.getElementById('btn-claim');
+      st.innerHTML = 'Syncing...';
+      
+      pendingMined = 0;
+      updateUI(); 
+      
+      const data = await syncUser();
+      
+      if (data) {
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        btn.textContent = '✅ Claimed!';
-      } catch (e) {
-        btn.textContent = '❌ ' + (e.message || 'Error');
+        st.innerHTML = '✅ Claimed!';
+        setTimeout(() => {
+            st.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR';
+        }, 2000);
+      } else {
+        st.innerHTML = 'Error';
       }
-      claiming = false;
-      setTimeout(() => { btn.innerHTML = CLAIM_HTML; btn.disabled = false; }, 1800);
     }
 
     function showScreen(id) {
@@ -416,52 +497,52 @@
     }
 
     function switchTab(tab) {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
       if (tab === 'mining') { showScreen('screen-dashboard'); document.getElementById('nav-mining').classList.add('active'); }
       else if (tab === 'friends') { showScreen('screen-friends'); document.getElementById('nav-friends').classList.add('active'); }
-      else if (tab === 'withdraw') { showScreen('screen-withdraw'); document.getElementById('nav-withdraw').classList.add('active'); updateUI(); }
+      else if (tab === 'withdraw') {
+        showScreen('screen-withdraw'); document.getElementById('nav-withdraw').classList.add('active');
+        document.getElementById('wd-balance').textContent = (serverBalance + pendingMined).toFixed(4);
+        document.getElementById('user-name-wd').textContent = tgUser.first_name;
+      }
     }
 
     function copyRefLink() { navigator.clipboard.writeText(myRefLink); tg.showAlert('Copied!'); }
     function shareRefLink() {
-      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn up to 150 ZYR/day! 🚀`;
+      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn up to 150 ZYR/day! 🚀\n\n${myRefLink}`;
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`);
     }
 
-    async function requestWithdraw() {
+    function requestWithdraw() {
       const st = document.getElementById('status-wd');
-      const btn = document.getElementById('btn-wd');
       const address = document.getElementById('wd-address').value.trim();
       const amount = parseFloat(document.getElementById('wd-amount').value);
-
-      if (!/^([EU]Q[A-Za-z0-9_-]{46}|0:[0-9a-fA-F]{64})$/.test(address)) { st.textContent = '❌ Enter a valid TON address.'; st.className = 'status err'; return; }
+      const total = serverBalance + pendingMined;
+      
+      if (!address || address.length < 48) { st.textContent = '❌ Enter a valid TON address.'; st.className = 'status err'; return; }
       if (!amount || amount < 10000) { st.textContent = '❌ Minimum is 10,000 ZYR.'; st.className = 'status err'; return; }
-      if (amount > serverBalance) { st.textContent = '❌ Insufficient balance. Claim your mined ZYR first.'; st.className = 'status err'; return; }
+      if (amount > total) { st.textContent = '❌ Insufficient balance.'; st.className = 'status err'; return; }
 
-      st.textContent = '⏳ Sending request...'; st.className = 'status ok'; btn.disabled = true;
-      try {
-        const d = await api('/request-withdraw', { amount, address });
-        serverBalance = d.balance; updateUI();
-        document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
-        st.textContent = '';
+      st.textContent = '⏳ Sending request...'; st.className = 'status ok';
+
+      fetch(BACKEND + '/request-withdraw', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, username: tgUser.first_name, amount: amount, address: address })
+      })
+      .then(res => { if (!res.ok) throw new Error('Server error'); return res.json(); })
+      .then(data => {
+        serverBalance -= amount;
+        if (pendingMined > amount) pendingMined -= amount; else pendingMined = 0;
+        
+        updateUI(); document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
         showScreen('screen-pending');
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-      } catch (e) { st.textContent = '❌ ' + e.message; st.className = 'status err'; }
-      btn.disabled = false;
+      })
+      .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
     }
 
     // اجرای اولیه
-    (async () => {
-      if (!tg.initData) {
-        const st = document.getElementById('status-join');
-        st.textContent = '❌ Please open this app inside Telegram.'; st.className = 'status err';
-        document.getElementById('btn-next-1').disabled = true;
-        return;
-      }
-      const d = await syncUser();
-      if (d && d.has_paid) startApp();
-      else if (!d) { const st = document.getElementById('status-join'); st.textContent = '❌ Server error: ' + lastSyncError; st.className = 'status err'; }
-    })();
+    syncUser();
   </script>
 </body>
-</html>
+                                                                               </html>
