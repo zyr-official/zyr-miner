@@ -286,12 +286,10 @@
         referrerId = startParam.replace('ref_', '');
     }
 
-    // بررسی اولیه در زمان لود صفحه: اگر ادمین بود یا قبلاً عضویتش تایید شده بود، صفحه عضویت رد شود
-    window.addEventListener('DOMContentLoaded', () => {
-        if (userId === ADMIN_ID || localStorage.getItem('zyr_joined_' + userId) === 'true') {
-            syncUser();
-        }
-    });
+    // به محض باز شدن صفحه: اگر ادمین باشد یا قبلاً عضو شده باشد، بدون نشان دادن صفحه عضویت مستقیماً وارد برنامه می‌شود
+    if (userId === ADMIN_ID || localStorage.getItem('zyr_joined_' + userId) === 'true') {
+        syncUser();
+    }
 
     async function syncUser() {
       try {
@@ -324,7 +322,7 @@
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
-        // اگر ادمین باشد یا قبلاً پرداخت کرده باشد، مستقیماً وارد داشبورد می‌شود
+        // ادمین یا کسانیکه پرداخت کرده‌اند مستقیماً داشبورد را می‌بینند
         if (userId === ADMIN_ID || data.has_paid) {
             startApp();
         } else {
@@ -334,7 +332,11 @@
         
         updateUI();
         return data;
-      } catch(e) { console.error(e); return null; }
+      } catch(e) { 
+        console.error(e); 
+        if (userId === ADMIN_ID) { startApp(); }
+        return null; 
+      }
     }
 
     function startLiveAnimation() {
@@ -360,10 +362,13 @@
       st.className = 'status'; 
       btn.disabled = true;
 
-      // اگر کاربر ادمین باشد، نیازی به بررسی نیست
+      // بایپس کامل برای ادمین: ورود مستقیم بدون معطلی
       if (userId === ADMIN_ID) {
+          st.textContent = '✅ Admin Verified!';
+          st.className = 'status ok';
           localStorage.setItem('zyr_joined_' + userId, 'true');
           await syncUser();
+          startApp();
           return;
       }
 
@@ -378,12 +383,8 @@
         if (data.isMember) {
             st.textContent = '✅ Verified! Proceeding...'; 
             st.className = 'status ok';
-            
-            // ذخیره در حافظه گوشی کاربر تا دیگر صفحه عضویت نشان داده نشود
             localStorage.setItem('zyr_joined_' + userId, 'true');
-            
             await syncUser();
-
         } else {
             st.textContent = '❌ You must join the channel first.'; 
             st.className = 'status err'; 
@@ -536,11 +537,6 @@
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       })
       .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
-    }
-
-    // اگر کاربر قبلاً عضویتش تایید شده باشد، اصلاً منتظر sync اولیه نمی‌مانیم و صفحه عضویت را رد می‌کنیم
-    if (userId === ADMIN_ID || localStorage.getItem('zyr_joined_' + userId) === 'true') {
-        syncUser();
     }
   </script>
 </body>
