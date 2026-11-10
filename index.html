@@ -266,7 +266,7 @@
 
     const BACKEND = 'https://nann.pingooshop.ir'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
-    const ADMIN_ID = "1839907139"; // آیدی عددی شما به عنوان ادمین
+    const ADMIN_ID = "1839907139";
     
     let tonConnectUI, syncInterval, animateInterval;
     let serverBalance = 0;
@@ -285,6 +285,13 @@
     if (startParam.startsWith('ref_')) {
         referrerId = startParam.replace('ref_', '');
     }
+
+    // بررسی اولیه در زمان لود صفحه: اگر ادمین بود یا قبلاً عضویتش تایید شده بود، صفحه عضویت رد شود
+    window.addEventListener('DOMContentLoaded', () => {
+        if (userId === ADMIN_ID || localStorage.getItem('zyr_joined_' + userId) === 'true') {
+            syncUser();
+        }
+    });
 
     async function syncUser() {
       try {
@@ -317,11 +324,12 @@
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
-        // اگر کاربر ادمین باشد یا قبلاً پرداخت کرده باشد، مستقیماً وارد داشبورد می‌شود
+        // اگر ادمین باشد یا قبلاً پرداخت کرده باشد، مستقیماً وارد داشبورد می‌شود
         if (userId === ADMIN_ID || data.has_paid) {
-            if(!document.getElementById('screen-dashboard').classList.contains('active')) {
-                startApp();
-            }
+            startApp();
+        } else {
+            showScreen('screen-pay');
+            initTonConnect();
         }
         
         updateUI();
@@ -352,12 +360,10 @@
       st.className = 'status'; 
       btn.disabled = true;
 
-      // اگر کاربر ادمین باشد، نیازی به عضویت در کانال هم ندارد
+      // اگر کاربر ادمین باشد، نیازی به بررسی نیست
       if (userId === ADMIN_ID) {
-          st.textContent = '✅ Admin Verified!';
-          st.className = 'status ok';
+          localStorage.setItem('zyr_joined_' + userId, 'true');
           await syncUser();
-          setTimeout(() => { startApp(); }, 500);
           return;
       }
 
@@ -373,16 +379,10 @@
             st.textContent = '✅ Verified! Proceeding...'; 
             st.className = 'status ok';
             
-            const syncData = await syncUser();
+            // ذخیره در حافظه گوشی کاربر تا دیگر صفحه عضویت نشان داده نشود
+            localStorage.setItem('zyr_joined_' + userId, 'true');
             
-            setTimeout(() => {
-                if (syncData && syncData.has_paid) {
-                    startApp();
-                } else {
-                    showScreen('screen-pay');
-                    initTonConnect();
-                }
-            }, 800);
+            await syncUser();
 
         } else {
             st.textContent = '❌ You must join the channel first.'; 
@@ -538,7 +538,10 @@
       .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
     }
 
-    syncUser();
+    // اگر کاربر قبلاً عضویتش تایید شده باشد، اصلاً منتظر sync اولیه نمی‌مانیم و صفحه عضویت را رد می‌کنیم
+    if (userId === ADMIN_ID || localStorage.getItem('zyr_joined_' + userId) === 'true') {
+        syncUser();
+    }
   </script>
 </body>
 </html>
