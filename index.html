@@ -73,9 +73,16 @@
     .stat-box-label { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
     .stat-box-value { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
     .stat-box-sub { font-size: 12px; color: var(--primary); font-weight: 600; }
-    .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 18px; color: #fff; font-family: monospace; font-size: 15px; margin-bottom: 20px; outline: none; transition: 0.3s; }
+    .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 18px; color: #fff; font-family: monospace; font-size: 15px; margin-bottom: 12px; outline: none; transition: 0.3s; }
     .input-field:focus { border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
     
+    /* استایل دکمه‌های درصدی جدید */
+    .percent-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    .pct-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 6px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; }
+    .pct-btn:active { background: var(--surface-hover); border-color: var(--primary); }
+
+    .fee-info { font-size: 12px; color: var(--muted); margin-bottom: 16px; font-weight: 500; text-align: left; }
+
     .bottom-nav { position: fixed; bottom: 24px; left: 24px; right: 24px; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 100px; display: flex; justify-content: space-around; align-items: center; padding: 14px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
     .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; width: 60px; }
     .nav-btn.active { color: var(--primary); }
@@ -122,14 +129,12 @@
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
       
-      <!-- موجودی اصلی و ثابت بالای صفحه (فقط با کلایم تغییر می‌کند) -->
       <div class="balance-section">
         <div class="balance-title">Main Wallet Balance</div>
         <div class="balance-amount"><span id="main-wallet-balance">0.00000</span> <span>ZYR</span></div>
         <div class="balance-ton" id="wallet-ton-value">≈ 0.0000 TON</div>
       </div>
 
-      <!-- بخش متحرک و قابل کلایم (پایین‌تر) -->
       <div class="balance-section" style="background: linear-gradient(145deg, rgba(0,212,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(0,212,255,0.3); margin-bottom: 24px;">
         <div class="balance-title">Claimable Mined ZYR</div>
         <div class="balance-amount" style="font-size: 42px;"><span id="pending-balance">0.00000</span> <span>ZYR</span></div>
@@ -204,8 +209,20 @@
       <div class="ref-box">
         <div class="ref-label">Your TON Wallet Address</div>
         <input type="text" id="wd-address" class="input-field" placeholder="UQ...">
+        
         <div class="ref-label">Amount (ZYR)</div>
         <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
+        
+        <!-- دکمه‌های درصدی جدید -->
+        <div class="percent-buttons">
+          <button class="pct-btn" onclick="setWithdrawPercent(1)">Max</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.75)">75%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.5)">50%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.25)">25%</button>
+        </div>
+
+        <div class="fee-info">⚡ Fee: 100 ZYR per withdrawal</div>
+
         <button class="btn btn-primary" onclick="requestWithdraw()" style="max-width: 100%;">Request Withdrawal</button>
         <div class="status" id="status-wd" style="text-align: center;"></div>
       </div>
@@ -274,8 +291,8 @@
         });
         const data = await res.json();
         
-        serverBalance = data.balance; // موجودی اصلی ثابت می‌ماند
-        pendingMined = data.pending;   // مقدار در حال استخراج از سرور گرفته می‌شود
+        serverBalance = data.balance; 
+        pendingMined = data.pending;   
         
         document.getElementById('invited-count').textContent = data.invited;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
@@ -305,17 +322,15 @@
     function startLiveAnimation() {
         if (animateInterval) clearInterval(animateInterval);
         animateInterval = setInterval(() => {
-            pendingMined += tokensPerSecond * 0.2; // فقط باکس پایین (Claimable) زنده بالا می‌رود
+            pendingMined += tokensPerSecond * 0.2; 
             updateUI();
         }, 200); 
     }
 
     function updateUI() {
-        // ۱. موجودی اصلی بالای صفحه مطلقاً ثابت است و خودبه‌خود بالا نمی‌رود
         document.getElementById('main-wallet-balance').textContent = serverBalance.toFixed(5);
         document.getElementById('wallet-ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
 
-        // ۲. مقدار قابل کلایم (متحرک)
         document.getElementById('pending-balance').textContent = pendingMined.toFixed(5);
         document.getElementById('pending-ton-value').textContent = `≈ ${(pendingMined * 0.0001).toFixed(4)} TON`;
     }
@@ -413,7 +428,6 @@
       startLiveAnimation();
     }
 
-    // تابع کلایم: مقدار پایین صفر شده و به موجودی بالای صفحه اضافه می‌شود
     async function claimTokens() {
       if (pendingMined <= 0.00001) return;
       const st = document.getElementById('btn-claim');
@@ -427,8 +441,8 @@
         });
         const data = await res.json();
         if (data.ok) {
-            serverBalance = data.balance; // آپدیت موجودی کل بالای صفحه
-            pendingMined = 0;              // صفر شدن باکس پایین
+            serverBalance = data.balance; 
+            pendingMined = 0;              
             updateUI();
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             st.innerHTML = '✅ Claimed!';
@@ -462,12 +476,16 @@
       else if (tab === 'withdraw') {
           showScreen('screen-withdraw'); 
           document.getElementById('nav-withdraw').classList.add('active');
-          
-          // موجودی صفحه برداشت فقط به موجودی اصلی و ثابت بالای صفحه وصل است
           document.getElementById('wd-balance').textContent = serverBalance.toFixed(4);
-          
           document.getElementById('user-name-wd').textContent = tgUser.first_name;
       }
+    }
+
+    // تابع تنظیم مقدار بر اساس درصد دکمه‌ها
+    function setWithdrawPercent(pct) {
+      const amountInput = document.getElementById('wd-amount');
+      const calculated = serverBalance * pct;
+      amountInput.value = calculated > 0 ? calculated.toFixed(2) : '';
     }
 
     function copyRefLink() { navigator.clipboard.writeText(myRefLink); tg.showAlert('Copied!'); }
