@@ -31,6 +31,7 @@ def init_db():
         id TEXT PRIMARY KEY, 
         first_name TEXT,
         balance REAL DEFAULT 0, 
+        total_mined REAL DEFAULT 0,
         referrer_id TEXT,
         referral_earned REAL DEFAULT 0,
         has_paid INTEGER DEFAULT 0,
@@ -56,6 +57,10 @@ class WithdrawRequest(BaseModel):
 class MemberCheckRequest(BaseModel):
     user_id: str
 
+class ClaimRequest(BaseModel):
+    user_id: str
+    amount: float
+
 # --- API بررسی عضویت در کانال ---
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
@@ -68,7 +73,7 @@ async def check_member(req: MemberCheckRequest):
     except Exception as e:
         return {"isMember": False, "error": str(e)}
 
-# --- API سینک کردن کاربر (ورود اولیه) ---
+# --- API سینک کردن کاربر ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     conn = get_db()
@@ -76,7 +81,6 @@ async def sync_user(req: UserSyncRequest):
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
     
-    # اگه کاربر جدیده
     if not user:
         c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
                   (req.user_id, req.first_name, req.referrer_id, time.time()))
@@ -84,18 +88,15 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # ✅ شرط ادمین
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
-        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
+        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), req.user_id))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # تعداد دوستان دعوت‌شده
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
     
-    # ✅ محاسبه لول و سرعت ماینینگ
     if invited_count >= 20:
         rate_per_day = 150
         level = 4
@@ -106,23 +107,30 @@ async def sync_user(req: UserSyncRequest):
         rate_per_day = 110
         level = 2
     else:
-        rate_per_day = 80  # لول ۱
+        rate_per_day = 80
         level = 1
     
     tokens_per_second = rate_per_day / 86400
     
-    # ⚠️ باگ قبلی: زمان آخرین ماینینگ با سرعت جدید محاسبه نمیشد.
-    # حالا زمان رو می‌گیریم و با سرعت جدید حساب می‌کنیم
-    time_diff = time.time() - user['last_mining']
-    earned = time_diff * tokens_per_second
-    new_balance = user['balance'] + earned
-    
-    c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
-    conn.commit()
+    if user['has_paid']:
+        time_diff = time.time() - user['last_mining']
+        earned = time_diff * tokens_per_second
+        new_balance = user['balance'] + earned
+        new_total_mined = user['total_mined'] + earned
+        
+        c.execute("UPDATE users SET balance=?, total_mined=?, last_mining=? WHERE id=?", 
+                  (new_balance, new_total_mined, time.time(), req.user_id))
+        conn.commit()
+    else:
+        new_balance = 0
+        new_total_mined = 0
+        c.execute("UPDATE users SET last_mining=? WHERE id=?", (time.time(), req.user_id))
+        conn.commit()
     
     conn.close()
     return {
         "balance": round(new_balance, 5),
+        "total_mined": round(new_total_mined, 5),
         "has_paid": bool(user['has_paid']),
         "invited": invited_count,
         "referral_earned": round(user['referral_earned'], 2),
@@ -130,7 +138,28 @@ async def sync_user(req: UserSyncRequest):
         "level": level
     }
 
-# --- API ثبت پرداخت (تاییدیه) ---
+# ✅ API جدید برای ثبت دکمه Claim
+@app.post("/claim")
+async def claim_tokens(req: ClaimRequest):
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid amount")
+        
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+    user = c.fetchone()
+    
+    if not user or not user['has_paid']:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Miner not active")
+        
+    c.execute("UPDATE users SET balance = balance + ? WHERE id=?", (req.amount, req.user_id))
+    conn.commit()
+    conn.close()
+    
+    return {"ok": True}
+
+# --- API ثبت پرداخت ---
 @app.post("/confirm-payment")
 async def confirm_payment(req: MemberCheckRequest):
     conn = get_db()
@@ -139,10 +168,10 @@ async def confirm_payment(req: MemberCheckRequest):
     user = c.fetchone()
     
     if user and not user['has_paid']:
-        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
+        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), req.user_id))
         
         if user['referrer_id']:
-            c.execute("UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
+            c.execute("UPDATE users SET balance=balance+300, total_mined=total_mined+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
         
         conn.commit()
         conn.close()
@@ -154,6 +183,9 @@ async def confirm_payment(req: MemberCheckRequest):
 # --- API برداشت ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+        
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT balance FROM users WHERE id=?", (req.user_id,))
