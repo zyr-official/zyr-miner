@@ -243,6 +243,7 @@
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
     let claiming = false;
+    let lastSyncError = '';
 
     const tgUser = tg.initDataUnsafe?.user || { id: 0, first_name: 'ZYR User' };
     const userId = String(tgUser.id);
@@ -290,7 +291,7 @@
         if (d.has_paid && !document.getElementById('screen-dashboard').classList.contains('active')
             && !document.getElementById('main-nav').offsetParent) startApp();
         return d;
-      } catch (e) { console.error(e); return null; }
+      } catch (e) { console.error(e); lastSyncError = e.message || 'Network error'; return null; }
     }
 
     function startLiveAnimation() {
@@ -319,12 +320,13 @@
         if (data.isMember) {
           st.textContent = '✅ Verified! Proceeding...'; st.className = 'status ok';
           const s = await syncUser();
+          if (!s) { st.textContent = '❌ Server error: ' + lastSyncError; st.className = 'status err'; btn.disabled = false; return; }
           setTimeout(() => {
             if (s && s.has_paid) startApp();
             else { showScreen('screen-pay'); initTonConnect(); }
           }, 800);
         } else {
-          st.textContent = '❌ You must join the channel first.'; st.className = 'status err'; btn.disabled = false;
+          st.textContent = data.error ? ('❌ Bot error: ' + data.error) : '❌ You must join the channel first.'; st.className = 'status err'; btn.disabled = false;
         }
       } catch (e) {
         st.textContent = '❌ ' + (e.message || 'Error checking membership.'); st.className = 'status err'; btn.disabled = false;
@@ -458,6 +460,7 @@
       }
       const d = await syncUser();
       if (d && d.has_paid) startApp();
+      else if (!d) { const st = document.getElementById('status-join'); st.textContent = '❌ Server error: ' + lastSyncError; st.className = 'status err'; }
     })();
   </script>
 </body>
