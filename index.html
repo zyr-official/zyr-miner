@@ -266,6 +266,7 @@
 
     const BACKEND = 'https://nann.pingooshop.ir'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
+    const ADMIN_ID = "1839907139"; // آیدی عددی شما به عنوان ادمین
     
     let tonConnectUI, syncInterval, animateInterval;
     let serverBalance = 0;
@@ -277,7 +278,6 @@
     const userId = tgUser.id.toString();
     const myRefCode = userId;
     
-    // لینک دعوت استاندارد ربات که دستور start=ref_ را ارسال می‌کند
     const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
 
     let referrerId = null;
@@ -317,7 +317,8 @@
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
-        if (data.has_paid) {
+        // اگر کاربر ادمین باشد یا قبلاً پرداخت کرده باشد، مستقیماً وارد داشبورد می‌شود
+        if (userId === ADMIN_ID || data.has_paid) {
             if(!document.getElementById('screen-dashboard').classList.contains('active')) {
                 startApp();
             }
@@ -350,6 +351,15 @@
       st.textContent = 'Checking membership...'; 
       st.className = 'status'; 
       btn.disabled = true;
+
+      // اگر کاربر ادمین باشد، نیازی به عضویت در کانال هم ندارد
+      if (userId === ADMIN_ID) {
+          st.textContent = '✅ Admin Verified!';
+          st.className = 'status ok';
+          await syncUser();
+          setTimeout(() => { startApp(); }, 500);
+          return;
+      }
 
       try {
         const res = await fetch(BACKEND + '/check-member', {
