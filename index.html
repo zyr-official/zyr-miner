@@ -36,11 +36,11 @@
     .profile-name p { font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.5px; }
     .badge { background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.2); padding: 8px 16px; border-radius: 100px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--primary); }
     .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px var(--primary); animation: blink 1s infinite; }
-    .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 36px; padding: 40px 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 24px; backdrop-filter: blur(30px); box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); }
+    .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 36px; padding: 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 16px; backdrop-filter: blur(30px); box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); }
     .balance-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 12px; font-weight: 600; }
-    .balance-amount { font-size: 56px; font-weight: 700; letter-spacing: -2.5px; display: flex; justify-content: center; align-items: baseline; gap: 8px; transition: all 0.1s ease; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
-    .balance-amount span { font-size: 22px; color: var(--primary); font-weight: 700; letter-spacing: 0; }
-    .balance-ton { font-size: 15px; color: var(--muted); margin-top: 12px; font-weight: 500; }
+    .balance-amount { font-size: 42px; font-weight: 700; letter-spacing: -2px; display: flex; justify-content: center; align-items: baseline; gap: 8px; transition: all 0.1s ease; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
+    .balance-amount span { font-size: 18px; color: var(--primary); font-weight: 700; letter-spacing: 0; }
+    .balance-ton { font-size: 14px; color: var(--muted); margin-top: 8px; font-weight: 500; }
     .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); }
     .engine-info { display: flex; flex-direction: column; gap: 6px; }
     .engine-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
@@ -121,11 +121,21 @@
         </div>
         <div class="badge"><div class="badge-dot"></div> Online</div>
       </div>
+      
+      <!-- موجودی کل (بالای صفحه) -->
       <div class="balance-section">
-        <div class="balance-title">Total Mined</div>
-        <div class="balance-amount"><span id="main-balance">0.00000</span> <span>ZYR</span></div>
-        <div class="balance-ton" id="ton-value">≈ 0.0000 TON</div>
+        <div class="balance-title">Main Wallet Balance</div>
+        <div class="balance-amount"><span id="main-wallet-balance">0.00000</span> <span>ZYR</span></div>
+        <div class="balance-ton" id="wallet-ton-value">≈ 0.0000 TON</div>
       </div>
+
+      <!-- مقداری که دورش خط کشیدید (قابل کلایم و متحرک) -->
+      <div class="balance-section" style="background: linear-gradient(145deg, rgba(0,212,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(0,212,255,0.3); margin-bottom: 24px;">
+        <div class="balance-title">Claimable Mined ZYR</div>
+        <div class="balance-amount" style="font-size: 42px;"><span id="pending-balance">0.00000</span> <span>ZYR</span></div>
+        <div class="balance-ton" id="pending-ton-value">≈ 0.0000 TON</div>
+      </div>
+
       <div class="mining-engine">
         <div class="engine-info">
           <div class="engine-status"><div class="pulse"></div> Engine Running</div>
@@ -299,9 +309,13 @@
     }
 
     function updateUI() {
-        const totalDisplay = serverBalance + pendingMined;
-        document.getElementById('main-balance').textContent = totalDisplay.toFixed(5);
-        document.getElementById('ton-value').textContent = `≈ ${(totalDisplay * 0.0001).toFixed(4)} TON`;
+        // ۱. موجودی کل در بالای صفحه
+        document.getElementById('main-wallet-balance').textContent = serverBalance.toFixed(5);
+        document.getElementById('wallet-ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
+
+        // ۲. مقدار قابل کلایم (همانی که تند تند بالا می‌رود)
+        document.getElementById('pending-balance').textContent = pendingMined.toFixed(5);
+        document.getElementById('pending-ton-value').textContent = `≈ ${(pendingMined * 0.0001).toFixed(4)} TON`;
     }
 
     async function checkMembership() {
@@ -397,9 +411,11 @@
       startLiveAnimation();
     }
 
+    // عملکرد کلایم: صفر کردن مقدار متحرک و انتقال آن به موجودی کل بالای صفحه
     async function claimTokens() {
+      if (pendingMined <= 0.00001) return;
       const st = document.getElementById('btn-claim');
-      st.innerHTML = 'Syncing...';
+      st.innerHTML = 'Claiming...';
       
       try {
         const res = await fetch(BACKEND + '/claim', {
@@ -409,8 +425,8 @@
         });
         const data = await res.json();
         if (data.ok) {
-            serverBalance = data.balance;
-            pendingMined = 0;
+            serverBalance = data.balance; // آپدیت موجودی کل بالای صفحه
+            pendingMined = 0;              // صفر شدن بخش متحرک قابل کلایم
             updateUI();
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             st.innerHTML = '✅ Claimed!';
