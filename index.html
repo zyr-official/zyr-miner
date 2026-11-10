@@ -95,7 +95,7 @@
 </head>
 <body>
 
-  <div class="screen" id="screen-join">
+  <div class="screen active" id="screen-join">
     <div class="onboarding">
       <div class="icon-box">⚡</div>
       <h1>Join ZYR Network</h1>
@@ -262,7 +262,7 @@
 
   <script>
     const tg = window.Telegram.WebApp;
-    tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505');
+    try { tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505'); } catch(e) {}
 
     const BACKEND = 'https://nann.pingooshop.ir'; 
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
@@ -286,27 +286,12 @@
         referrerId = startParam.replace('ref_', '');
     }
 
-    window.addEventListener('DOMContentLoaded', async () => {
-        if (userId === ADMIN_ID) {
-            syncUser();
-            return;
-        }
-
+    // لود اولیه با اطمینان کامل از عدم فریز شدن صفحه
+    window.addEventListener('DOMContentLoaded', () => {
         try {
-            const res = await fetch(BACKEND + '/check-member', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            });
-            const data = await res.json();
-
-            if (data.isMember) {
-                syncUser();
-            } else {
-                showScreen('screen-join');
-            }
-        } catch (e) {
             showScreen('screen-join');
+        } catch (e) {
+            console.error(e);
         }
     });
 
@@ -323,12 +308,11 @@
         });
         const data = await res.json();
         
-        serverBalance = data.balance; 
-        pendingMined = data.pending;   
+        serverBalance = data.balance || 0; 
+        pendingMined = data.pending || 0;   
         
-        document.getElementById('active-count').textContent = data.active_invited;
-        document.getElementById('inactive-count').textContent = data.inactive_invited;
-        document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
+        document.getElementById('active-count').textContent = data.active_invited || 0;
+        document.getElementById('inactive-count').textContent = data.inactive_invited || 0;
         
         if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
             currentRatePerDay = data.rate_per_day;
@@ -352,7 +336,11 @@
         return data;
       } catch(e) { 
         console.error(e); 
-        if (userId === ADMIN_ID) { startApp(); }
+        if (userId === ADMIN_ID) { 
+            startApp(); 
+        } else {
+            showScreen('screen-join');
+        }
         return null; 
       }
     }
@@ -366,11 +354,12 @@
     }
 
     function updateUI() {
-        document.getElementById('main-wallet-balance').textContent = serverBalance.toFixed(5);
-        document.getElementById('wallet-ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
-
-        document.getElementById('pending-balance').textContent = pendingMined.toFixed(5);
-        document.getElementById('pending-ton-value').textContent = `≈ ${(pendingMined * 0.0001).toFixed(4)} TON`;
+        try {
+            document.getElementById('main-wallet-balance').textContent = serverBalance.toFixed(5);
+            document.getElementById('wallet-ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
+            document.getElementById('pending-balance').textContent = pendingMined.toFixed(5);
+            document.getElementById('pending-ton-value').textContent = `≈ ${(pendingMined * 0.0001).toFixed(4)} TON`;
+        } catch(e) {}
     }
 
     async function checkMembership() {
@@ -381,7 +370,9 @@
       btn.disabled = true;
 
       if (userId === ADMIN_ID) {
-          syncUser();
+          st.textContent = '✅ Admin Verified!';
+          st.className = 'status ok';
+          setTimeout(() => { syncUser(); }, 400);
           return;
       }
 
@@ -405,16 +396,18 @@
             btn.disabled = false;
         }
       } catch (e) {
-        st.textContent = '❌ Error checking membership. Try again.'; 
+        st.textContent = '❌ Connection error. Try again.'; 
         st.className = 'status err'; 
         btn.disabled = false;
       }
     }
 
     function initTonConnect() {
-      if (tonConnectUI) return;
-      tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl: BACKEND + '/tonconnect-manifest.json', buttonRootId: 'ton-connect-button' });
-      tonConnectUI.onStatusChange(wallet => { document.getElementById('btn-pay').disabled = !wallet; });
+      try {
+          if (tonConnectUI) return;
+          tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl: BACKEND + '/tonconnect-manifest.json', buttonRootId: 'ton-connect-button' });
+          tonConnectUI.onStatusChange(wallet => { document.getElementById('btn-pay').disabled = !wallet; });
+      } catch(e) {}
     }
 
     async function payTON() {
@@ -494,7 +487,9 @@
 
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active'); window.scrollTo(0, 0);
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active'); 
+      window.scrollTo(0, 0);
     }
 
     function switchTab(tab) {
@@ -524,7 +519,7 @@
     function copyRefLink() { navigator.clipboard.writeText(myRefLink); tg.showAlert('Copied!'); }
     function shareRefLink() {
       const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn up to 150 ZYR/day! 🚀\n\n${myRefLink}`;
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`);
+      try { tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`); } catch(e) {}
     }
 
     function requestWithdraw() {
@@ -548,7 +543,7 @@
         updateUI(); 
         document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
         showScreen('screen-pending');
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        try { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
       })
       .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
     }
