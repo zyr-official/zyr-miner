@@ -87,7 +87,6 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # مستثنی کردن ادمین از پرداخت
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
@@ -128,7 +127,7 @@ async def sync_user(req: UserSyncRequest):
         "level": level
     }
 
-# --- اندپوینت کلایم پاداش ---
+# --- اندپوینت کلایم ---
 @app.post("/claim")
 async def claim_tokens(req: ClaimRequest):
     conn = get_db()
