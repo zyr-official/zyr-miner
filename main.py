@@ -200,12 +200,14 @@ async def manifest():
 @app.post("/check-member")
 async def check_member(req: Auth):
     user, _ = verify_init_data(req.init_data)
+    if int(user["id"]) == ADMIN_ID:
+        return {"isMember": True}
     try:
         m = await telegram_app.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(user["id"]))
         return {"isMember": m.status in ("member", "administrator", "creator")}
     except Exception as e:
         log.warning("check_member: %s", e)
-        return {"isMember": False}
+        return {"isMember": False, "error": str(e)}
 
 
 @app.post("/sync-user")
