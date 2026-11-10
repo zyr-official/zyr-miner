@@ -280,13 +280,21 @@
     
     const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
 
+    // خواندن هوشمند شناسه معرف هم از تلگرام و هم از پارامترهای وب‌سایت
     let referrerId = null;
     const startParam = tg.initDataUnsafe?.start_param || "";
     if (startParam.startsWith('ref_')) {
         referrerId = startParam.replace('ref_', '');
     }
+    if (!referrerId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryRef = urlParams.get('startapp') || urlParams.get('ref');
+        if (queryRef && queryRef.startsWith('ref_')) {
+            referrerId = queryRef.replace('ref_', '');
+        }
+    }
 
-    // لود اولیه: بررسی زنده عضویت؛ اگر عضو باشد مستقیماً می‌رود صفحه اصلی، اگر نباشد صفحه Join را می‌آورد
+    // لود اولیه: بررسی عضویت کانال؛ اگر عضو بود مستقیم ورود، اگر نبود نمایش صفحه عضویت
     window.addEventListener('DOMContentLoaded', async () => {
         if (userId === ADMIN_ID) {
             syncUser();
@@ -302,14 +310,11 @@
             const data = await res.json();
 
             if (data.isMember) {
-                // اگر کاربر از قبل عضو بود، مستقیم برود سراغ همگام‌سازی و ورود به داشبورد/پرداخت
                 syncUser();
             } else {
-                // اگر عضو نبود، صفحه جوین نمایش داده شود
                 showScreen('screen-join');
             }
         } catch (e) {
-            // در صورت خطای شبکه، به صورت پیش‌فرض صفحه جوین نمایش داده شود
             showScreen('screen-join');
         }
     });
