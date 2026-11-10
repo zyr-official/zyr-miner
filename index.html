@@ -76,7 +76,6 @@
     .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 18px; color: #fff; font-family: monospace; font-size: 15px; margin-bottom: 12px; outline: none; transition: 0.3s; }
     .input-field:focus { border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
     
-    /* استایل دکمه‌های درصدی جدید */
     .percent-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
     .pct-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 6px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; }
     .pct-btn:active { background: var(--surface-hover); border-color: var(--primary); }
@@ -213,7 +212,6 @@
         <div class="ref-label">Amount (ZYR)</div>
         <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
         
-        <!-- دکمه‌های درصدی جدید -->
         <div class="percent-buttons">
           <button class="pct-btn" onclick="setWithdrawPercent(1)">Max</button>
           <button class="pct-btn" onclick="setWithdrawPercent(0.75)">75%</button>
@@ -270,7 +268,9 @@
     const tgUser = tg.initDataUnsafe?.user || { id: '123456789', first_name: 'ZYR User' };
     const userId = tgUser.id.toString();
     const myRefCode = userId;
-    const myRefLink = `https://t.me/ZYRMiningBot/app?startapp=ref_${myRefCode}`;
+    
+    // لینک دعوت تصحیح‌شده با آیدی صحیح ZYRMining_bot
+    const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
 
     let referrerId = null;
     const startParam = tg.initDataUnsafe?.start_param || "";
@@ -481,7 +481,6 @@
       }
     }
 
-    // تابع تنظیم مقدار بر اساس درصد دکمه‌ها
     function setWithdrawPercent(pct) {
       const amountInput = document.getElementById('wd-amount');
       const calculated = serverBalance * pct;
