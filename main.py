@@ -11,7 +11,7 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes, Comman
 # ====== تنظیمات ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
 ADMIN_ID = 1839907139
-WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
+WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining" 
 # =====================
 
@@ -76,7 +76,6 @@ async def sync_user(req: UserSyncRequest):
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
     
-    # اگه کاربر جدیده
     if not user:
         c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
                   (req.user_id, req.first_name, req.referrer_id, time.time()))
@@ -84,18 +83,16 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # ✅ شرط ادمین
+    # ✅ شرط ادمین: اگر آیدی با آیدی ادمین یکی بود، خودکار پرداخت شده حساب میشه
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
     
-    # تعداد دوستان دعوت‌شده
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
     
-    # ✅ محاسبه لول و سرعت ماینینگ
     if invited_count >= 20:
         rate_per_day = 150
         level = 4
@@ -106,13 +103,11 @@ async def sync_user(req: UserSyncRequest):
         rate_per_day = 110
         level = 2
     else:
-        rate_per_day = 80  # لول ۱
+        rate_per_day = 80 
         level = 1
     
     tokens_per_second = rate_per_day / 86400
     
-    # ⚠️ باگ قبلی: زمان آخرین ماینینگ با سرعت جدید محاسبه نمیشد.
-    # حالا زمان رو می‌گیریم و با سرعت جدید حساب می‌کنیم
     time_diff = time.time() - user['last_mining']
     earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
@@ -196,11 +191,9 @@ telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name or "Miner"
-    
     ref_id = None
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
-    
     url = WEBAPP_URL
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
@@ -212,11 +205,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 **Invite friends:** Boost your mining rate (up to 150 ZYR/day) and earn 300 ZYR per friend.\n\n"
         f"👇 **Tap below to start!**"
     )
-    
-    keyboard = [[
-        InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))
-    ]]
-    
+    keyboard = [[ InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url)) ]]
     await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 telegram_app.add_handler(CommandHandler("start", start_command))
@@ -226,10 +215,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data.split("_")
     action, wd_id, user_id, amount = data[0], data[1], data[2], float(data[3])
-
     conn = get_db()
     c = conn.cursor()
-
     if action == "approve":
         c.execute("UPDATE withdrawals SET status='approved' WHERE id=?", (wd_id,))
         await query.edit_message_text(text=f"✅ Approved {amount} ZYR for user {user_id}.")
@@ -237,7 +224,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         c.execute("UPDATE users SET balance = balance + ? WHERE id=?", (amount, user_id))
         c.execute("UPDATE withdrawals SET status='rejected' WHERE id=?", (wd_id,))
         await query.edit_message_text(text=f"❌ Rejected {amount} ZYR. Funds returned.")
-    
     conn.commit()
     conn.close()
 
