@@ -1,264 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>ZYR Miner</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-  :root {
-    --bg: #0b1e2d; --surface: #12303f; --line: #1f4558;
-    --text: #e8f1f2; --muted: #8fa9b3; --gold: #f2b134; --gold-ink: #2b1d00;
-    --ok: #4fd1a1; --err: #ff7b7b;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
-  main { max-width: 480px; margin: 0 auto; }
-  h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0 0 8px; }
-  p { margin: 0 0 8px; }
-  .muted { color: var(--muted); font-size: 14px; }
-  .hero { text-align: center; padding: 28px 0 20px; }
-  .pending { font-size: 44px; font-weight: 700; letter-spacing: -0.5px;
-    font-variant-numeric: tabular-nums; color: var(--gold); }
-  .unit { font-size: 15px; color: var(--muted); }
-  .card { background: var(--surface); border: 1px solid var(--line);
-    border-radius: 14px; padding: 16px; margin-top: 12px; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 0; }
-  .row + .row { border-top: 1px solid var(--line); }
-  .row b { font-variant-numeric: tabular-nums; }
-  button { width: 100%; border: 0; border-radius: 10px; padding: 13px 16px;
-    font: inherit; font-weight: 700; cursor: pointer;
-    background: var(--gold); color: var(--gold-ink); margin-top: 10px; }
-  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
-  button:disabled { opacity: .5; cursor: default; }
-  button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-  input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
-    border-radius: 10px; padding: 12px; font: inherit; margin-top: 8px; }
-  .bar { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-top: 8px; }
-  .bar > i { display: block; height: 100%; background: var(--gold); width: 0; transition: width .4s; }
-  .link { word-break: break-all; font-size: 13px; color: var(--muted);
-    background: var(--bg); border-radius: 8px; padding: 10px; margin-top: 6px; }
-  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
-    max-width: 448px; margin: 0 auto; background: var(--text); color: var(--bg);
-    padding: 12px 14px; border-radius: 10px; font-weight: 600; display: none; }
-  #toast.err { background: var(--err); }
-  .hidden { display: none !important; }
-  @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZYR Miner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- TonConnect UI SDK -->
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <style>
+        body { background: #0f172a; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-top: 20px; }
+        button { background: #38bdf8; border: none; padding: 12px 20px; color: #0f172a; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        #ton-connect { display: flex; justify-content: center; margin-top: 15px; }
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
-<main>
-  <div id="blocked" class="card hidden">
-    <h2>Open this app inside Telegram</h2>
-    <p class="muted">The miner only works from the Telegram bot, so your account stays yours.</p>
-  </div>
+    <h1>⚡ ZYR Cloud Miner</h1>
+    
+    <div id="app-container" class="hidden">
+        <div class="card">
+            <h3>Balance: <span id="balance">0.00</span> ZYR</h3>
+            <p>Pending: <span id="pending">0.00</span> ZYR</p>
+            <button onclick="claimTokens()">Claim Tokens</button>
+        </div>
 
-  <div id="app" class="hidden">
-    <section class="hero">
-      <h1>Mined and waiting</h1>
-      <div class="pending"><span id="pending">0.00000</span></div>
-      <div class="unit">ZYR</div>
-      <button id="claimBtn" disabled>Claim</button>
-    </section>
+        <div class="card" id="activation-card">
+            <h3>🚀 Miner Status</h3>
+            <p id="status-text">Inactive (Activation fee: 0.1 TON)</p>
+            <div id="ton-connect"></div>
+            <button id="pay-btn" class="hidden" onclick="simulatePayment()">Confirm 0.1 TON Payment</button>
+        </div>
 
-    <section class="card" id="gate">
-      <h2>Join the channel to continue</h2>
-      <p class="muted">Claiming and withdrawing need you to be a member of our channel.</p>
-      <button id="joinBtn">Join channel</button>
-      <button id="checkBtn" class="ghost">I joined, check again</button>
-    </section>
+        <div class="card">
+            <h3>Referral Link</h3>
+            <p id="ref-link">Loading...</p>
+            <button onclick="copyRef()">Copy Invite Link</button>
+        </div>
+    </div>
 
-    <section class="card">
-      <div class="row"><span>Balance</span><b><span id="balance">0</span> ZYR</b></div>
-      <div class="row"><span>Mining rate</span><b><span id="rate">80</span> ZYR / day</b></div>
-      <div class="row"><span>Level</span><b id="level">1</b></div>
-      <div class="bar"><i id="levelBar"></i></div>
-      <p class="muted" id="nextLevel" style="margin-top:8px"></p>
-    </section>
+    <div id="error-container" style="margin-top: 50px; color: #f87171;">
+        <h2>لطفاً مینی‌اپ را داخل محیط تلگرام باز کنید.</h2>
+    </div>
 
-    <section class="card" id="activate">
-      <h2>Activate your miner</h2>
-      <p class="muted">Send <b id="priceTon">0.1</b> TON. Your payment is matched to your account automatically, so don't change the comment.</p>
-      <button id="payBtn">Pay in your TON wallet</button>
-      <button id="verifyBtn" class="ghost">I paid, activate</button>
-    </section>
+    <script>
+        const API_URL = "https://nann.pingooshop.ir"; // آدرس بک‌اند
+        const ADMIN_TON_ADDRESS = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"; // آدرس ولت شما برای دریافت 0.1 تون
+        const tg = window.Telegram.WebApp;
+        tg.expand();
 
-    <section class="card">
-      <h2>Invite friends</h2>
-      <p class="muted">You earn <span id="reward">300</span> ZYR when a friend activates their miner.</p>
-      <div class="row"><span>Joined with your link</span><b id="invited">0</b></div>
-      <div class="row"><span>Activated</span><b id="active">0</b></div>
-      <div class="row"><span>Not activated yet</span><b id="inactive">0</b></div>
-      <div class="row"><span>Earned from invites</span><b><span id="refEarned">0</span> ZYR</b></div>
-      <div class="link" id="refLink">Loading…</div>
-      <button id="copyBtn" class="ghost">Copy invite link</button>
-    </section>
+        // بررسی احراز هویت تلگرام و حذف فالبک ناامن ادمین
+        if (!tg.initData || !tg.initDataUnsafe?.user) {
+            document.getElementById('error-container').style.display = 'block';
+            document.getElementById('app-container').style.display = 'none';
+        } else {
+            document.getElementById('error-container').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            initApp();
+        }
 
-    <section class="card" id="withdrawCard">
-      <h2>Withdraw</h2>
-      <p class="muted">Minimum <span id="minWd">100</span> ZYR. Requests are reviewed manually.</p>
-      <input id="wdAmount" type="number" inputmode="decimal" placeholder="Amount in ZYR">
-      <input id="wdAddress" type="text" placeholder="Your TON address" autocomplete="off">
-      <button id="wdBtn">Request withdrawal</button>
-    </section>
-  </div>
-</main>
-<div id="toast" role="status"></div>
+        let tonConnectUI;
 
-<script>
-  const API_URL = "https://nann.pingooshop.ir";   // آدرس بک‌اند
+        function initApp() {
+            const user = tg.initDataUnsafe.user;
 
-  const tg = window.Telegram?.WebApp;
-  const initData = tg?.initData || "";
-  const $ = (id) => document.getElementById(id);
+            // خواندن صحیح کد معرف از start_param یا URL
+            const urlParams = new URLSearchParams(window.location.search);
+            let referrerId = tg.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('ref');
+            if (referrerId) {
+                referrerId = referrerId.replace('ref_', '');
+            }
 
-  if (!initData) {
-    $("blocked").classList.remove("hidden");
-  } else {
-    tg.ready(); tg.expand();
-    start();
-  }
+            // تنظیم لینک دعوت شخصی
+            document.getElementById('ref-link').innerText = `https://t.me/ZYRMining_bot/app?startapp=ref_${user.id}`;
 
-  function toast(msg, isErr) {
-    const t = $("toast");
-    t.textContent = msg;
-    t.className = isErr ? "err" : "";
-    t.style.display = "block";
-    clearTimeout(toast.t);
-    toast.t = setTimeout(() => (t.style.display = "none"), 3500);
-  }
+            // راه‌اندازی TonConnect UI
+            tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+                manifestUrl: `${API_URL}/tonconnect-manifest.json`,
+                buttonRootId: 'ton-connect'
+            });
 
-  async function api(path, body) {
-    const res = await fetch(API_URL + path, {
-      method: body === undefined ? "GET" : "POST",
-      headers: { "Content-Type": "application/json", "X-Init-Data": initData },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    let data = {};
-    try { data = await res.json(); } catch (_) {}
-    if (!res.ok) throw new Error(data.detail || "Request failed");
-    return data;
-  }
+            syncUser(referrerId);
+            setInterval(syncUser, 10000);
+        }
 
-  const fmt = (n, d = 5) => Number(n).toFixed(d);
-  let cfg = null, st = null, syncedAt = 0, member = false;
+        async function syncUser(referrerId) {
+            try {
+                let res = await fetch(`${API_URL}/sync-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        init_data: tg.initData,
+                        referrer_id: referrerId ? String(referrerId) : null
+                    })
+                });
+                let data = await res.json();
+                document.getElementById('balance').innerText = data.balance;
+                document.getElementById('pending').innerText = data.pending;
 
-  function startParamRef() {
-    const q = new URLSearchParams(location.search);
-    return tg.initDataUnsafe?.start_param || q.get("ref") || q.get("startapp") || null;
-  }
+                if (data.has_paid) {
+                    document.getElementById('status-text').innerText = "✅ Miner Active (Rate: " + data.rate_per_day + " ZYR/day)";
+                    document.getElementById('pay-btn').style.display = 'none';
+                } else {
+                    document.getElementById('status-text').innerText = "⚠️ Inactive. Deposit 0.1 TON to activate.";
+                    document.getElementById('pay-btn').style.display = 'block';
+                }
+            } catch (e) {
+                console.error("Sync error:", e);
+            }
+        }
 
-  function render() {
-    $("balance").textContent = fmt(st.balance, 3);
-    $("rate").textContent = st.rate_per_day;
-    $("level").textContent = st.level;
-    $("invited").textContent = st.invited;
-    $("active").textContent = st.active_invited;
-    $("inactive").textContent = st.inactive_invited;
-    $("refEarned").textContent = st.referral_earned;
+        async function simulatePayment() {
+            try {
+                if (!tonConnectUI.connected) {
+                    alert("لطفاً ابتدا کیف پول TON خود را متصل کنید.");
+                    await tonConnectUI.openModal();
+                    return;
+                }
 
-    const tiers = [0, 5, 10, 20];
-    const next = tiers[st.level];           // null/undefined at max level
-    if (next !== undefined) {
-      const prev = tiers[st.level - 1];
-      $("levelBar").style.width = Math.min(100, ((st.active_invited - prev) / (next - prev)) * 100) + "%";
-      $("nextLevel").textContent = `${next - st.active_invited} more activated friends for the next level.`;
-    } else {
-      $("levelBar").style.width = "100%";
-      $("nextLevel").textContent = "You are at the top level.";
-    }
+                // ارسال 0.1 TON به آدرس ادمین
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 300,
+                    messages: [{
+                        address: ADMIN_TON_ADDRESS,
+                        amount: "100000000" // 0.1 TON به نانوپایز
+                    }]
+                };
 
-    $("activate").classList.toggle("hidden", st.has_paid);
-    $("withdrawCard").classList.toggle("hidden", !st.has_paid);
-    $("claimBtn").disabled = !st.has_paid || !member;
-    $("gate").classList.toggle("hidden", member);
-  }
+                const result = await tonConnectUI.sendTransaction(transaction);
+                if (result) {
+                    // پس از موفقیت تراکنش، به سرور اعلام می‌کنیم
+                    let res = await fetch(`${API_URL}/confirm-payment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ init_data: tg.initData })
+                    });
+                    let data = await res.json();
+                    if (data.ok) {
+                        alert("پرداخت با موفقیت تایید و ماینر فعال شد!");
+                        syncUser();
+                    }
+                }
+            } catch (e) {
+                console.error("Payment error:", e);
+                alert("پرداخت انجام نشد یا لغو گردید.");
+            }
+        }
 
-  function tick() {
-    if (!st) return;
-    const p = st.has_paid ? st.pending + ((Date.now() - syncedAt) / 1000) * st.rate_per_day / 86400 : 0;
-    $("pending").textContent = fmt(p);
-  }
+        async function claimTokens() {
+            try {
+                let res = await fetch(`${API_URL}/claim`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ init_data: tg.initData })
+                });
+                let data = await res.json();
+                if (data.ok) {
+                    document.getElementById('balance').innerText = data.balance;
+                    document.getElementById('pending').innerText = "0.00";
+                    alert("Claimed successfully!");
+                }
+            } catch (e) {
+                console.error("Claim error:", e);
+            }
+        }
 
-  async function sync() {
-    try {
-      st = await api("/sync-user", { referrer_id: startParamRef() });
-      syncedAt = Date.now();
-      render(); tick();
-    } catch (e) { console.error(e); }
-  }
-
-  async function checkMember(showMsg) {
-    try {
-      member = (await api("/check-member", {})).isMember;
-      if (showMsg && !member) toast("Not a member yet. Join the channel and try again.", true);
-    } catch (e) { member = false; }
-    if (st) render();
-  }
-
-  async function start() {
-    try { cfg = await api("/config"); } catch (e) { toast("Server unreachable", true); return; }
-    $("app").classList.remove("hidden");
-    $("priceTon").textContent = cfg.price_ton;
-    $("reward").textContent = cfg.referral_reward;
-    $("minWd").textContent = cfg.min_withdraw;
-    const uid = tg.initDataUnsafe.user.id;
-    const refUrl = `https://t.me/${cfg.bot_username}/${cfg.app_short_name}?startapp=ref_${uid}`;
-    $("refLink").textContent = refUrl;
-
-    $("copyBtn").onclick = async () => {
-      try { await navigator.clipboard.writeText(refUrl); toast("Invite link copied"); }
-      catch (_) { toast("Copy failed. Select the link and copy it manually.", true); }
-    };
-    $("joinBtn").onclick = () => tg.openTelegramLink(`https://t.me/${cfg.channel.replace("@", "")}`);
-    $("checkBtn").onclick = () => checkMember(true);
-
-    $("payBtn").onclick = () => {
-      const url = `https://app.tonkeeper.com/transfer/${cfg.wallet}?amount=${cfg.price_nano}&text=zyr-${uid}`;
-      tg.openLink(url);
-    };
-    $("verifyBtn").onclick = async (ev) => {
-      ev.target.disabled = true;
-      try {
-        const r = await api("/verify-payment", {});
-        if (r.ok) { toast("Miner activated"); await sync(); }
-        else toast(r.message || "Payment not found yet", true);
-      } catch (e) { toast(e.message, true); }
-      ev.target.disabled = false;
-    };
-
-    $("claimBtn").onclick = async (ev) => {
-      ev.target.disabled = true;
-      try {
-        const r = await api("/claim", {});
-        toast(`Claimed ${fmt(r.claimed, 3)} ZYR`);
-        await sync();
-      } catch (e) { toast(e.message, true); }
-      render();
-    };
-
-    $("wdBtn").onclick = async (ev) => {
-      const amount = parseFloat($("wdAmount").value);
-      const address = $("wdAddress").value.trim();
-      if (!(amount > 0) || !address) return toast("Enter an amount and a TON address", true);
-      ev.target.disabled = true;
-      try {
-        await api("/request-withdraw", { amount, address });
-        toast("Withdrawal requested");
-        $("wdAmount").value = ""; $("wdAddress").value = "";
-        await sync();
-      } catch (e) { toast(e.message, true); }
-      ev.target.disabled = false;
-    };
-
-    await Promise.all([sync(), checkMember(false)]);
-    render();
-    setInterval(tick, 1000);
-    setInterval(sync, 30000);
-  }
-</script>
+        function copyRef() {
+            navigator.clipboard.writeText(`https://t.me/ZYRMining_bot/app?startapp=ref_${tg.initDataUnsafe.user.id}`);
+            alert("Referral link copied!");
+        }
+    </script>
 </body>
 </html>
