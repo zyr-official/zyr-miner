@@ -203,7 +203,6 @@ async def sync_user(req: UserSyncRequest):
     last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
     time_diff = max(0, current_time - last_mining)
 
-    # محاسبه دقیق مقدار استخراج شده در زمان آفلاین بودن
     pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
@@ -264,7 +263,6 @@ async def claim_mining(req: ClaimMiningRequest):
         server_pending = time_diff * tokens_per_sec
 
         new_balance = user['balance'] + server_pending
-        # آپدیت زمان شروع ماینینگ جدید به الان
         c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
             
         conn.commit()
