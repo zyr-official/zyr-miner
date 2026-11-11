@@ -40,6 +40,15 @@ def init_db():
         has_paid INTEGER DEFAULT 0,
         last_mining REAL DEFAULT 0
     )''')
+    
+    # جدول ثبت پاداش‌های رفرال برای هر دعوت
+    c.execute('''CREATE TABLE IF NOT EXISTS referrals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        referrer_id TEXT,
+        friend_id TEXT,
+        reward_claimed INTEGER DEFAULT 0
+    )''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT, amount REAL, address TEXT, status TEXT
@@ -70,6 +79,11 @@ class MemberCheckRequest(BaseModel):
 class ConfirmPaymentRequest(BaseModel):
     user_id: str
     tx_hash: str | None = None
+    init_data: str | None = None
+
+class ClaimRefRequest(BaseModel):
+    user_id: str
+    friend_id: str
     init_data: str | None = None
 
 # --- اعتبارسنجی init_data ---
@@ -143,7 +157,7 @@ async def check_member(req: MemberCheckRequest):
     except Exception as e:
         return {"isMember": False, "error": str(e)}
 
-# --- API: سینک کاربر ---
+# --- API: سینک کاربر و دریافت اطلاعات رفرال ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     uid = resolve_user_id(req)
@@ -153,10 +167,19 @@ async def sync_user(req: UserSyncRequest):
     user = c.fetchone()
 
     if not user:
+        # اگر معرف داشت، در جدول referrals ثبتش می‌کنیم
         c.execute(
             "INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)",
             (uid, req.first_name, req.referrer_id, time.time())
         )
+        if req.referrer_id:
+            # پیدا کردن آیدی اصلی معرف بر اساس کد ۶ رقمی آخر
+            c.execute("SELECT id FROM users WHERE substr(id, -6) = ? COLLATE NOCASE", (req.referrer_id,))
+            ref_user = c.fetchone()
+            if ref_user and ref_user['id'] != uid:
+                c.execute("INSERT INTO referrals (referrer_id, friend_id, reward_claimed) VALUES (?, ?, 0)", (ref_user['id'], uid))
+                c.execute("UPDATE users SET referrer_id=? WHERE id=?", (ref_user['id'], uid))
+        
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
@@ -167,14 +190,19 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
 
+    # شمارش تعداد دعوت‌شده‌ها و فعال‌ها
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (uid,))
     invited_count = c.fetchone()['count']
 
-    if invited_count >= 20:
+    c.execute("SELECT COUNT(*) as count FROM users u JOIN referrals r ON u.id = r.friend_id WHERE r.referrer_id=? AND u.has_paid=1", (uid,))
+    active_invited_count = c.fetchone()['count']
+
+    # تعیین لول بر اساس تعداد دعوت
+    if invited_count >= 10:
         rate_per_day, level = 150, 4
-    elif invited_count >= 10:
+    elif invited_count >= 6:
         rate_per_day, level = 130, 3
-    elif invited_count >= 5:
+    elif invited_count >= 3:
         rate_per_day, level = 110, 2
     else:
         rate_per_day, level = 80, 1
@@ -192,18 +220,33 @@ async def sync_user(req: UserSyncRequest):
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?",
               (new_balance, time.time(), uid))
     conn.commit()
+
+    # استخراج لیست دوستان دعوت‌شده همراه با وضعیت پرداخت و کلایم
+    c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
+    friends_rows = c.fetchall()
+    friends_list = []
+    for row in friends_rows:
+        friends_list.append({
+            "id": row['id'],
+            "name": row['first_name'],
+            "has_paid": bool(row['has_paid']),
+            "reward_claimed": bool(row['reward_claimed'])
+        })
+
     conn.close()
 
     return {
         "balance": round(new_balance, 5),
         "has_paid": bool(user['has_paid']),
         "invited": invited_count,
+        "active_invited": active_invited_count,
         "referral_earned": round(user['referral_earned'], 2),
         "rate_per_day": rate_per_day,
-        "level": level
+        "level": level,
+        "friends": friends_list
     }
 
-# --- API: تأیید پرداخت ---
+# --- API: تأیید پرداخت 0.1 تون ---
 @app.post("/confirm-payment")
 async def confirm_payment(req: ConfirmPaymentRequest):
     uid = resolve_user_id(req)
@@ -220,18 +263,39 @@ async def confirm_payment(req: ConfirmPaymentRequest):
         conn.close()
         return {"ok": False, "message": "Already paid"}
 
-    c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?",
-              (time.time(), uid))
-
-    if user['referrer_id']:
-        c.execute(
-            "UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?",
-            (user['referrer_id'],)
-        )
-
+    c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), uid))
     conn.commit()
     conn.close()
     return {"ok": True, "message": "Payment confirmed"}
+
+# --- API: کلایم پاداش ۳۰۰ تایی رفرال توسط معرف ---
+@app.post("/claim-ref-reward")
+async def claim_ref_reward(req: ClaimRefRequest):
+    uid = resolve_user_id(req)
+    conn = get_db()
+    c = conn.cursor()
+    
+    # بررسی اینکه این دوست واقعاً توسط این کاربر دعوت شده و پول داده و کلایم نشده
+    c.execute("SELECT * FROM referrals WHERE referrer_id=? AND friend_id=? AND reward_claimed=0", (uid, req.friend_id))
+    ref = c.fetchone()
+    if not ref:
+        conn.close()
+        return {"ok": False, "message": "Reward not available or already claimed"}
+
+    # بررسی اینکه دوست پرداخت کرده است یا خیر
+    c.execute("SELECT has_paid FROM users WHERE id=?", (req.friend_id,))
+    friend = c.fetchone()
+    if not friend or not friend['has_paid']:
+        conn.close()
+        return {"ok": False, "message": "Friend has not paid 0.1 TON yet"}
+
+    # اعطای ۳۰۰ توکن به معرف
+    c.execute("UPDATE users SET balance = balance + 300, referral_earned = referral_earned + 300 WHERE id=?", (uid,))
+    c.execute("UPDATE referrals SET reward_claimed = 1 WHERE referrer_id=? AND friend_id=?", (uid, req.friend_id))
+    
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "300 ZYR claimed successfully!"}
 
 # --- API: برداشت ---
 @app.post("/request-withdraw")
@@ -283,7 +347,6 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
-# --- هندلرها ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user or not update.message:
         return
@@ -300,7 +363,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⚡ **Welcome to ZYR Cloud Miner, {user_name}!**\n\n"
         f"⛏️ **Mine ZYR inside the app:** Start your session, claim tokens, and withdraw to TON.\n"
         f"💎 **Activate your miner:** Deposit 0.1 TON to start earning 80 ZYR daily.\n"
-        f"👥 **Invite friends:** Boost your mining rate (up to 150 ZYR/day) and earn 300 ZYR per friend.\n\n"
+        f"👥 **Invite friends:** Boost your mining rate and earn 300 ZYR when they pay 0.1 TON.\n\n"
         f"👇 **Tap below to start!**"
     )
     keyboard = [[InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]]
@@ -334,7 +397,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 telegram_app.add_handler(CommandHandler("start", start_command))
 telegram_app.add_handler(CallbackQueryHandler(handle_callback))
 
-# --- Webhook ---
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     if WEBHOOK_SECRET:
