@@ -1,22 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZYR Miner</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { background: #0f172a; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-top: 20px; }
-        button { background: #38bdf8; border: none; padding: 12px 20px; color: #0f172a; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZYR Miner</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+    body { background:#0f172a; color:#fff; font-family:sans-serif; text-align:center; padding:20px; margin:0; }
+    h1 { font-size:1.6rem; margin:10px 0 20px; }
+    .card { background:#1e293b; padding:20px; border-radius:12px; margin-top:20px; }
+    button {
+        background:#38bdf8; border:none; padding:12px 20px;
+        color:#0f172a; font-weight:bold; border-radius:8px;
+        cursor:pointer; margin-top:10px; width:100%;
+    }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    #ref-link { word-break:break-all; font-size:0.85rem; color:#94a3b8; }
+    .stats { display:flex; justify-content:space-around; margin-top:10px; font-size:0.9rem; }
+    .stats span { color:#38bdf8; font-weight:bold; }
+</style>
 </head>
 <body>
     <h1>⚡ ZYR Cloud Miner</h1>
+
     <div class="card">
         <h3>Balance: <span id="balance">0.00</span> ZYR</h3>
         <p>Pending: <span id="pending">0.00</span> ZYR</p>
-        <button onclick="claimTokens()">Claim Tokens</button>
+        <div class="stats">
+            <div>Level: <span id="level">1</span></div>
+            <div>Rate: <span id="rate">80</span> /day</div>
+        </div>
+        <button id="claim-btn" onclick="claimTokens()">Claim Tokens</button>
     </div>
 
     <div class="card">
@@ -25,65 +39,94 @@
         <button onclick="copyRef()">Copy Invite Link</button>
     </div>
 
-    <script>
-        const API_URL = "https://nann.pingooshop.ir"; 
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+<script>
+    const API_URL = "https://nann.pingooshop.ir";
+    const BOT_USERNAME = "ZYRMining_bot";
 
-        const user = tg.initDataUnsafe?.user || { id: "1839907139", first_name: "Admin" };
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        let referrerId = urlParams.get('startapp') || urlParams.get('ref');
-        if (referrerId) {
-            referrerId = referrerId.replace('ref_', '');
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.ready();
+
+    const rawInitData = tg.initData || "";
+    const user = tg.initDataUnsafe?.user;
+
+    if (!user) {
+        document.body.innerHTML =
+            "<h2 style='padding:20px'>⚠️ لطفاً این صفحه را از داخل تلگرام باز کنید.</h2>";
+        throw new Error("Not opened from Telegram");
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let referrerId = urlParams.get("startapp") || urlParams.get("ref") || null;
+    if (referrerId) referrerId = referrerId.replace("ref_", "");
+
+    const myRefLink = `https://t.me/${BOT_USERNAME}?startapp=ref_${user.id}`;
+    document.getElementById("ref-link").innerText = myRefLink;
+
+    const headers = {
+        "Content-Type": "application/json",
+        "X-Init-Data": rawInitData,
+    };
+
+    async function syncUser() {
+        try {
+            const res = await fetch(`${API_URL}/sync-user`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    user_id: String(user.id),
+                    first_name: user.first_name || "Miner",
+                    referrer_id: referrerId ? String(referrerId) : null,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Sync failed");
+
+            document.getElementById("balance").innerText = data.balance;
+            document.getElementById("pending").innerText = data.pending;
+            document.getElementById("level").innerText = data.level;
+            document.getElementById("rate").innerText = data.rate_per_day;
+        } catch (e) {
+            console.error("Sync error:", e);
         }
+    }
 
-        document.getElementById('ref-link').innerText = `https://t.me/ZYRMining_bot/app?startapp=ref_${user.id}`;
-
-        async function syncUser() {
-            try {
-                let res = await fetch(`${API_URL}/sync-user`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: String(user.id),
-                        first_name: user.first_name || "Miner",
-                        referrer_id: referrerId ? String(referrerId) : null
-                    })
-                });
-                let data = await res.json();
-                document.getElementById('balance').innerText = data.balance;
-                document.getElementById('pending').innerText = data.pending;
-            } catch (e) {
-                console.error("Sync error:", e);
+    async function claimTokens() {
+        const btn = document.getElementById("claim-btn");
+        btn.disabled = true;
+        btn.innerText = "Claiming...";
+        try {
+            const res = await fetch(`${API_URL}/claim`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ user_id: String(user.id) }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                document.getElementById("balance").innerText = data.balance;
+                document.getElementById("pending").innerText = "0.00";
+                tg.showAlert("✅ Claimed successfully!");
+            } else {
+                tg.showAlert("❌ " + (data.detail || "Claim failed"));
             }
+        } catch (e) {
+            console.error("Claim error:", e);
+            tg.showAlert("❌ Network error");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Claim Tokens";
         }
+    }
 
-        async function claimTokens() {
-            try {
-                let res = await fetch(`${API_URL}/claim`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: String(user.id) })
-                });
-                let data = await res.json();
-                if (data.ok) {
-                    document.getElementById('balance').innerText = data.balance;
-                    document.getElementById('pending').innerText = "0.00";
-                    alert("Claimed successfully!");
-                }
-            } catch (e) {
-                console.error("Claim error:", e);
-            }
-        }
+    function copyRef() {
+        navigator.clipboard
+            .writeText(myRefLink)
+            .then(() => tg.showAlert("✅ Referral link copied!"))
+            .catch(() => tg.showAlert("❌ Copy failed"));
+    }
 
-        function copyRef() {
-            navigator.clipboard.writeText(`https://t.me/ZYRMining_bot/app?startapp=ref_${user.id}`);
-            alert("Referral link copied!");
-        }
-
-        syncUser();
-        setInterval(syncUser, 10000);
-    </script>
+    syncUser();
+    setInterval(syncUser, 10000);
+</script>
 </body>
 </html>
