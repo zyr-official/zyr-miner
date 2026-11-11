@@ -101,9 +101,6 @@ def verify_init_data(init_data: str) -> str | None:
         computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(computed, received_hash):
             return None
-        auth_date = int(parsed.get("auth_date", "0"))
-        if time.time() - auth_date > 86400:
-            return None
         import json
         user = json.loads(parsed.get("user", "{}"))
         return str(user.get("id"))
@@ -118,7 +115,7 @@ def resolve_user_id(req) -> str:
             return verified
     if getattr(req, 'user_id', None):
         return str(req.user_id)
-    raise HTTPException(status_code=400, detail="user_id or valid init_data required")
+    raise HTTPException(status_code=400, detail="user_id required")
 
 telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
 
@@ -203,10 +200,10 @@ async def sync_user(req: UserSyncRequest):
         rate_per_day, level = 80, 1
 
     tokens_per_second = rate_per_day / 86400
-    last_mining = user['last_mining'] if user['last_mining'] and user['last_mining'] > 0 else current_time
+    last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
     time_diff = max(0, current_time - last_mining)
 
-    # محاسبه دقیق مقدار ماین شده بدون پریدن شمارنده
+    # محاسبه دقیق زمان‌های سپری شده (حتی زمانی که مینی‌اپ بسته بوده است)
     pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
@@ -239,16 +236,18 @@ async def claim_mining(req: ClaimMiningRequest):
     uid = resolve_user_id(req)
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT balance FROM users WHERE id=?", (uid,))
+    c.execute("SELECT balance, last_mining FROM users WHERE id=?", (uid,))
     user = c.fetchone()
     
+    current_time = time.time()
+    
     if not user:
-        conn.close()
-        raise HTTPException(status_code=404, detail="User not found")
+        new_balance = req.amount
+        c.execute("INSERT INTO users (id, balance, last_mining, has_paid) VALUES (?, ?, ?, 1)", (uid, new_balance, current_time))
+    else:
+        new_balance = user['balance'] + req.amount
+        c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
         
-    new_balance = user['balance'] + req.amount
-    # ثبت فوری و قطعی موجودی جدید همراه با بازنشانی تایمر به زمان جاری
-    c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, time.time(), uid))
     conn.commit()
     conn.close()
     return {"ok": True, "new_balance": round(new_balance, 5)}
@@ -262,14 +261,10 @@ async def confirm_payment(req: ConfirmPaymentRequest):
     user = c.fetchone()
 
     if not user:
-        conn.close()
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user['has_paid']:
-        conn.close()
-        return {"ok": False, "message": "Already paid"}
-
-    c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), uid))
+        c.execute("INSERT INTO users (id, has_paid, last_mining) VALUES (?, 1, ?)", (uid, time.time()))
+    else:
+        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), uid))
+        
     conn.commit()
     conn.close()
     return {"ok": True, "message": "Payment confirmed"}
@@ -284,7 +279,7 @@ async def claim_ref_reward(req: ClaimRefRequest):
     ref = c.fetchone()
     if not ref:
         conn.close()
-        return {"ok": False, "message": "Reward not available or already claimed"}
+        return {"ok": False, "message": "Reward not available"}
 
     c.execute("SELECT has_paid FROM users WHERE id=?", (req.friend_id,))
     friend = c.fetchone()
@@ -297,7 +292,7 @@ async def claim_ref_reward(req: ClaimRefRequest):
     
     conn.commit()
     conn.close()
-    return {"ok": True, "message": "300 ZYR claimed successfully!"}
+    return {"ok": True, "message": "300 ZYR claimed!"}
 
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
@@ -332,11 +327,9 @@ async def request_withdraw(req: WithdrawRequest):
     ]]
 
     try:
-        await bot.send_message(chat_id=ADMIN_ID, text=text,
-                               reply_markup=InlineKeyboardMarkup(keyboard),
-                               parse_mode='Markdown')
+        await bot.send_message(chat_id=ADMIN_ID, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
     except Exception as e:
-        print(f"[WITHDRAW] admin notify error: {e}")
+        print(f"[WITHDRAW] error: {e}")
 
     return {"ok": True}
 
@@ -368,9 +361,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👇 **Tap below to start!**"
     )
     keyboard = [[InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]]
-    await update.message.reply_text(welcome_text,
-                                    reply_markup=InlineKeyboardMarkup(keyboard),
-                                    parse_mode='Markdown')
+    await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
