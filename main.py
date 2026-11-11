@@ -203,7 +203,7 @@ async def sync_user(req: UserSyncRequest):
     last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
     time_diff = max(0, current_time - last_mining)
 
-    # محاسبه دقیق زمان‌های سپری شده (حتی زمانی که مینی‌اپ بسته بوده است)
+    # محاسبه دقیق مقدار استخراج شده در زمان آفلاین بودن کاربر
     pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
@@ -236,17 +236,33 @@ async def claim_mining(req: ClaimMiningRequest):
     uid = resolve_user_id(req)
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT balance, last_mining FROM users WHERE id=?", (uid,))
+    c.execute("SELECT balance, last_mining, has_paid FROM users WHERE id=?", (uid,))
     user = c.fetchone()
     
     current_time = time.time()
     
     if not user:
-        new_balance = req.amount
-        c.execute("INSERT INTO users (id, balance, last_mining, has_paid) VALUES (?, ?, ?, 1)", (uid, new_balance, current_time))
-    else:
-        new_balance = user['balance'] + req.amount
-        c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not user['has_paid']:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Miner not activated")
+
+    # محاسبه دقیق سود انباشته شده تا همین لحظه روی سرور برای جلوگیری از تقلب یا خطا
+    if invited_count >= 10: rate_per_day = 150
+    elif invited_count >= 6: rate_per_day = 130
+    elif invited_count >= 3: rate_per_day = 110
+    else: rate_per_day = 80
+    
+    # محاسبه از روی آخرین زمان ذخیره شده
+    tokens_per_sec = rate_per_day / 86400
+    time_diff = max(0, current_time - (user['last_mining'] or current_time))
+    server_pending = time_diff * tokens_per_sec
+
+    # انتقال مقدار به بالانس اصلی و به‌روزرسانی زمان شروع ماینینگ جدید به الان
+    new_balance = user['balance'] + server_pending
+    c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
         
     conn.commit()
     conn.close()
@@ -260,10 +276,11 @@ async def confirm_payment(req: ConfirmPaymentRequest):
     c.execute("SELECT * FROM users WHERE id=?", (uid,))
     user = c.fetchone()
 
+    current_time = time.time()
     if not user:
-        c.execute("INSERT INTO users (id, has_paid, last_mining) VALUES (?, 1, ?)", (uid, time.time()))
+        c.execute("INSERT INTO users (id, has_paid, last_mining) VALUES (?, 1, ?)", (uid, current_time))
     else:
-        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), uid))
+        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (current_time, uid))
         
     conn.commit()
     conn.close()
