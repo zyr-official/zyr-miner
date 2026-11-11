@@ -77,7 +77,6 @@ async def sync_user(req: UserSyncRequest):
     conn = get_db()
     c = conn.cursor()
     
-    # بایپس مطلق برای ادمین
     if req.user_id == str(ADMIN_ID):
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
@@ -94,7 +93,6 @@ async def sync_user(req: UserSyncRequest):
         user = c.fetchone()
         
         if not user:
-            # ثبت کاربر جدید همراه با شناسه معرف (جلوگیری از خود-ارتباطی)
             ref_id = req.referrer_id if req.referrer_id != req.user_id else None
             c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
                       (req.user_id, req.first_name, ref_id, time.time()))
@@ -102,7 +100,6 @@ async def sync_user(req: UserSyncRequest):
             c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
             user = c.fetchone()
         else:
-            # اگر کاربر قبلاً ثبت شده بود اما معرف نداشت و حالا با لینک معرف آمده است
             if not user['referrer_id'] and req.referrer_id and req.referrer_id != req.user_id:
                 c.execute("UPDATE users SET referrer_id=? WHERE id=?", (req.referrer_id, req.user_id))
                 conn.commit()
@@ -231,6 +228,7 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
+# تنظیمات تلگرام
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -239,8 +237,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
     
-    # ساخت لینک مستقیم استاندارد با پشتیبانی از startapp برای مینی‌اپ
-    url = f"https://t.me/ZYRMining_bot/app"
+    # ساخت لینک مینی‌اپ همراه با پارامتر رففرال
+    url = WEBAPP_URL
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
         
@@ -280,6 +278,11 @@ async def on_startup():
     await telegram_app.initialize()
     await telegram_app.start()
 
+@app.on_event("shutdown")
+async def on_shutdown():
+    await telegram_app.stop()
+
+# نقطه دریافت وب‌هوک تلگرام
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
