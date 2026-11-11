@@ -9,7 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, We
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
 # ====== تنظیمات ======
-BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2Ko")
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
 CHANNEL_ID = "@ZYRMining" 
@@ -237,6 +237,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
     
+    # ساخت لینک مینی‌اپ همراه با پارامتر رففرال
     url = WEBAPP_URL
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
@@ -281,6 +282,7 @@ async def on_startup():
 async def on_shutdown():
     await telegram_app.stop()
 
+# نقطه دریافت وب‌هوک تلگرام
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
