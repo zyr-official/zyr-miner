@@ -491,6 +491,7 @@
         st.textContent = '⏳ Verifying payment...';
         st.className = 'status ok';
 
+        // تلاش برای تایید پرداخت با چند بار تکرار در صورت تاخیر شبکه
         let paidConfirmed = false;
         for (let i = 0; i < 3; i++) {
             try {
