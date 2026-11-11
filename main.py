@@ -49,7 +49,7 @@ def init_db():
 
 init_db()
 
-# --- مدل‌ها (init_data اختیاری است) ---
+# --- مدل‌ها ---
 class UserSyncRequest(BaseModel):
     user_id: str
     first_name: str
@@ -72,9 +72,8 @@ class ConfirmPaymentRequest(BaseModel):
     tx_hash: str | None = None
     init_data: str | None = None
 
-# --- اعتبارسنجی init_data (اختیاری) ---
+# --- اعتبارسنجی init_data ---
 def verify_init_data(init_data: str) -> str | None:
-    """اگر معتبر بود user_id را برمی‌گرداند، وگرنه None"""
     if not init_data:
         return None
     try:
@@ -87,7 +86,6 @@ def verify_init_data(init_data: str) -> str | None:
         computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(computed, received_hash):
             return None
-        # auth_date check (۱ روز اعتبار)
         auth_date = int(parsed.get("auth_date", "0"))
         if time.time() - auth_date > 86400:
             return None
@@ -99,7 +97,6 @@ def verify_init_data(init_data: str) -> str | None:
         return None
 
 def resolve_user_id(req) -> str:
-    """user_id را از user_id مستقیم یا init_data معتبر استخراج می‌کند"""
     if getattr(req, 'init_data', None):
         verified = verify_init_data(req.init_data)
         if verified:
@@ -133,11 +130,9 @@ app.add_middleware(
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
     uid = resolve_user_id(req)
-    print(f"[CHECK-MEMBER] user={uid}")
     bot = Bot(token=BOT_TOKEN)
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(uid))
-        print(f"[CHECK-MEMBER] status={member.status}")
         if member.status in (
             ChatMemberStatus.MEMBER,
             ChatMemberStatus.ADMINISTRATOR,
@@ -146,7 +141,6 @@ async def check_member(req: MemberCheckRequest):
             return {"isMember": True}
         return {"isMember": False}
     except Exception as e:
-        print(f"[CHECK-MEMBER] ERROR: {type(e).__name__}: {e}")
         return {"isMember": False, "error": str(e)}
 
 # --- API: سینک کاربر ---
