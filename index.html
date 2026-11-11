@@ -5,145 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZYR Miner</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- TonConnect UI SDK -->
-    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     <style>
         body { background: #0f172a; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
         .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-top: 20px; }
         button { background: #38bdf8; border: none; padding: 12px 20px; color: #0f172a; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        #ton-connect { display: flex; justify-content: center; margin-top: 15px; }
-        .hidden { display: none; }
     </style>
 </head>
 <body>
     <h1>⚡ ZYR Cloud Miner</h1>
-    
-    <div id="app-container" class="hidden">
-        <div class="card">
-            <h3>Balance: <span id="balance">0.00</span> ZYR</h3>
-            <p>Pending: <span id="pending">0.00</span> ZYR</p>
-            <button onclick="claimTokens()">Claim Tokens</button>
-        </div>
-
-        <div class="card" id="activation-card">
-            <h3>🚀 Miner Status</h3>
-            <p id="status-text">Inactive (Activation fee: 0.1 TON)</p>
-            <div id="ton-connect"></div>
-            <button id="pay-btn" class="hidden" onclick="simulatePayment()">Confirm 0.1 TON Payment</button>
-        </div>
-
-        <div class="card">
-            <h3>Referral Link</h3>
-            <p id="ref-link">Loading...</p>
-            <button onclick="copyRef()">Copy Invite Link</button>
-        </div>
+    <div class="card">
+        <h3>Balance: <span id="balance">0.00</span> ZYR</h3>
+        <p>Pending: <span id="pending">0.00</span> ZYR</p>
+        <button onclick="claimTokens()">Claim Tokens</button>
     </div>
 
-    <div id="error-container" style="margin-top: 50px; color: #f87171;">
-        <h2>لطفاً مینی‌اپ را داخل محیط تلگرام باز کنید.</h2>
+    <div class="card">
+        <h3>Referral Link</h3>
+        <p id="ref-link">Loading...</p>
+        <button onclick="copyRef()">Copy Invite Link</button>
     </div>
 
     <script>
-        const API_URL = "https://nann.pingooshop.ir"; // آدرس بک‌اند
-        const ADMIN_TON_ADDRESS = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"; // آدرس ولت شما برای دریافت 0.1 تون
+        const API_URL = "https://nann.pingooshop.ir"; 
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // بررسی احراز هویت تلگرام و حذف فالبک ناامن ادمین
-        if (!tg.initData || !tg.initDataUnsafe?.user) {
-            document.getElementById('error-container').style.display = 'block';
-            document.getElementById('app-container').style.display = 'none';
-        } else {
-            document.getElementById('error-container').style.display = 'none';
-            document.getElementById('app-container').style.display = 'block';
-            initApp();
+        const user = tg.initDataUnsafe?.user || { id: "1839907139", first_name: "Admin" };
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        let referrerId = urlParams.get('startapp') || urlParams.get('ref');
+        if (referrerId) {
+            referrerId = referrerId.replace('ref_', '');
         }
 
-        let tonConnectUI;
+        document.getElementById('ref-link').innerText = `https://t.me/ZYRMining_bot/app?startapp=ref_${user.id}`;
 
-        function initApp() {
-            const user = tg.initDataUnsafe.user;
-
-            // خواندن صحیح کد معرف از start_param یا URL
-            const urlParams = new URLSearchParams(window.location.search);
-            let referrerId = tg.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('ref');
-            if (referrerId) {
-                referrerId = referrerId.replace('ref_', '');
-            }
-
-            // تنظیم لینک دعوت شخصی
-            document.getElementById('ref-link').innerText = `https://t.me/ZYRMining_bot/app?startapp=ref_${user.id}`;
-
-            // راه‌اندازی TonConnect UI
-            tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-                manifestUrl: `${API_URL}/tonconnect-manifest.json`,
-                buttonRootId: 'ton-connect'
-            });
-
-            syncUser(referrerId);
-            setInterval(syncUser, 10000);
-        }
-
-        async function syncUser(referrerId) {
+        async function syncUser() {
             try {
                 let res = await fetch(`${API_URL}/sync-user`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        init_data: tg.initData,
+                        user_id: String(user.id),
+                        first_name: user.first_name || "Miner",
                         referrer_id: referrerId ? String(referrerId) : null
                     })
                 });
                 let data = await res.json();
                 document.getElementById('balance').innerText = data.balance;
                 document.getElementById('pending').innerText = data.pending;
-
-                if (data.has_paid) {
-                    document.getElementById('status-text').innerText = "✅ Miner Active (Rate: " + data.rate_per_day + " ZYR/day)";
-                    document.getElementById('pay-btn').style.display = 'none';
-                } else {
-                    document.getElementById('status-text').innerText = "⚠️ Inactive. Deposit 0.1 TON to activate.";
-                    document.getElementById('pay-btn').style.display = 'block';
-                }
             } catch (e) {
                 console.error("Sync error:", e);
-            }
-        }
-
-        async function simulatePayment() {
-            try {
-                if (!tonConnectUI.connected) {
-                    alert("لطفاً ابتدا کیف پول TON خود را متصل کنید.");
-                    await tonConnectUI.openModal();
-                    return;
-                }
-
-                // ارسال 0.1 TON به آدرس ادمین
-                const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 300,
-                    messages: [{
-                        address: ADMIN_TON_ADDRESS,
-                        amount: "100000000" // 0.1 TON به نانوپایز
-                    }]
-                };
-
-                const result = await tonConnectUI.sendTransaction(transaction);
-                if (result) {
-                    // پس از موفقیت تراکنش، به سرور اعلام می‌کنیم
-                    let res = await fetch(`${API_URL}/confirm-payment`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ init_data: tg.initData })
-                    });
-                    let data = await res.json();
-                    if (data.ok) {
-                        alert("پرداخت با موفقیت تایید و ماینر فعال شد!");
-                        syncUser();
-                    }
-                }
-            } catch (e) {
-                console.error("Payment error:", e);
-                alert("پرداخت انجام نشد یا لغو گردید.");
             }
         }
 
@@ -152,7 +64,7 @@
                 let res = await fetch(`${API_URL}/claim`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ init_data: tg.initData })
+                    body: JSON.stringify({ user_id: String(user.id) })
                 });
                 let data = await res.json();
                 if (data.ok) {
@@ -166,9 +78,12 @@
         }
 
         function copyRef() {
-            navigator.clipboard.writeText(`https://t.me/ZYRMining_bot/app?startapp=ref_${tg.initDataUnsafe.user.id}`);
+            navigator.clipboard.writeText(`https://t.me/ZYRMining_bot/app?startapp=ref_${user.id}`);
             alert("Referral link copied!");
         }
+
+        syncUser();
+        setInterval(syncUser, 10000);
     </script>
 </body>
 </html>
