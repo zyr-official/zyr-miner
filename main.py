@@ -28,16 +28,13 @@ from telegram.ext import (
 # ============================================================
 # =======================  تنظیمات  ==========================
 # ============================================================
-BOT_TOKEN   = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
-ADMIN_ID    = int(os.getenv("ADMIN_ID", "1839907139"))
-WEBAPP_URL  = os.getenv("WEBAPP_URL", "https://zyr-official.github.io/zyr-miner/")
-BACKEND_URL = os.getenv("BACKEND_URL", "https://nann.pingooshop.ir")
-CHANNEL_ID  = os.getenv("CHANNEL_ID", "@ZYRMining")
-ICON_URL    = os.getenv("ICON_URL", "https://zyr-official.github.io/zyr-miner/icon.png")
-DB_PATH     = os.getenv("DB_PATH", "/tmp/zyr.db")
-
-if not BOT_TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN is required!")
+BOT_TOKEN   = "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc"
+ADMIN_ID    = 1839907139
+WEBAPP_URL  = "https://zyr-official.github.io/zyr-miner/"
+BACKEND_URL = "https://nann.pingooshop.ir"
+CHANNEL_ID  = "@ZYRMining"
+ICON_URL    = "https://zyr-official.github.io/zyr-miner/icon.png"
+DB_PATH     = "/root/zyr-miner/zyr.db"
 
 # ============================================================
 # ======================  دیتابیس  ===========================
@@ -88,7 +85,6 @@ def validate_init_data(init_data: str) -> dict | None:
         received_hash = parsed.pop("hash", None)
         if not received_hash:
             return None
-
         data_check_string = "\n".join(
             f"{k}={v}" for k, v in sorted(parsed.items())
         )
@@ -98,7 +94,6 @@ def validate_init_data(init_data: str) -> dict | None:
         calculated = hmac.new(
             secret_key, data_check_string.encode(), hashlib.sha256
         ).hexdigest()
-
         if not hmac.compare_digest(calculated, received_hash):
             return None
         return parsed
@@ -169,7 +164,6 @@ telegram_app = Application.builder().token(BOT_TOKEN).build()
 async def lifespan(app: FastAPI):
     await telegram_app.initialize()
     await telegram_app.start()
-
     if BACKEND_URL.startswith("https://"):
         try:
             await telegram_app.bot.set_webhook(
@@ -179,9 +173,7 @@ async def lifespan(app: FastAPI):
             print(f"✅ Webhook set to {BACKEND_URL}/api/webhook")
         except Exception as e:
             print(f"⚠️ Webhook setup failed: {e}")
-
     yield
-
     await telegram_app.stop()
 
 
@@ -201,7 +193,6 @@ app.add_middleware(
 async def check_member(req: MemberCheckRequest):
     if req.user_id == str(ADMIN_ID):
         return {"isMember": True}
-
     bot = Bot(token=BOT_TOKEN)
     try:
         member = await bot.get_chat_member(
@@ -253,7 +244,6 @@ async def sync_user(req: UserSyncRequest, x_init_data: str | None = Header(None)
 
     c.execute("SELECT COUNT(*) AS c FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()["c"]
-
     c.execute(
         "SELECT COUNT(*) AS c FROM users WHERE referrer_id=? AND has_paid=1",
         (req.user_id,),
@@ -266,7 +256,6 @@ async def sync_user(req: UserSyncRequest, x_init_data: str | None = Header(None)
     pending_earned = (time.time() - user["last_mining"]) * tokens_per_second
 
     conn.close()
-
     return {
         "balance": round(user["balance"], 5),
         "pending": round(pending_earned, 5),
@@ -290,11 +279,9 @@ async def claim_tokens(req: ClaimRequest, x_init_data: str | None = Header(None)
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
-
     if not user:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
-
     if not user["has_paid"]:
         conn.close()
         raise HTTPException(status_code=403, detail="Activate your miner first")
@@ -305,7 +292,6 @@ async def claim_tokens(req: ClaimRequest, x_init_data: str | None = Header(None)
     )
     active_invited = c.fetchone()["c"]
     rate_per_day, _ = calc_rate(active_invited)
-
     earned = (time.time() - user["last_mining"]) * (rate_per_day / 86400)
     new_balance = user["balance"] + earned
 
@@ -315,7 +301,6 @@ async def claim_tokens(req: ClaimRequest, x_init_data: str | None = Header(None)
     )
     conn.commit()
     conn.close()
-
     return {"ok": True, "balance": round(new_balance, 5), "pending": 0}
 
 
@@ -325,7 +310,6 @@ async def confirm_payment(req: MemberCheckRequest):
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
-
     if user and not user["has_paid"]:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         if user["referrer_id"]:
@@ -339,7 +323,6 @@ async def confirm_payment(req: MemberCheckRequest):
         conn.commit()
         conn.close()
         return {"ok": True, "message": "Payment confirmed"}
-
     conn.close()
     return {"ok": False, "message": "Already paid or user not found"}
 
@@ -351,7 +334,6 @@ async def request_withdraw(
     verified_id = get_verified_user_id(x_init_data)
     if verified_id != req.user_id:
         raise HTTPException(status_code=403, detail="user_id mismatch")
-
     if req.amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
 
@@ -359,7 +341,6 @@ async def request_withdraw(
     c = conn.cursor()
     c.execute("SELECT balance FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
-
     if not user or user["balance"] < req.amount:
         conn.close()
         raise HTTPException(status_code=400, detail="Insufficient balance")
@@ -384,18 +365,16 @@ async def request_withdraw(
         f"💰 Amount: {req.amount} ZYR\n"
         f"📫 Address: `{req.address}`"
     )
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "✅ Approve",
-                callback_data=f"approve_{wd_id}_{req.user_id}_{req.amount}",
-            ),
-            InlineKeyboardButton(
-                "❌ Reject",
-                callback_data=f"reject_{wd_id}_{req.user_id}_{req.amount}",
-            ),
-        ]
-    ]
+    keyboard = [[
+        InlineKeyboardButton(
+            "✅ Approve",
+            callback_data=f"approve_{wd_id}_{req.user_id}_{req.amount}",
+        ),
+        InlineKeyboardButton(
+            "❌ Reject",
+            callback_data=f"reject_{wd_id}_{req.user_id}_{req.amount}",
+        ),
+    ]]
     await bot.send_message(
         chat_id=ADMIN_ID,
         text=text,
@@ -407,13 +386,11 @@ async def request_withdraw(
 
 @app.get("/tonconnect-manifest.json")
 async def get_manifest():
-    return JSONResponse(
-        {
-            "url": WEBAPP_URL,
-            "name": "ZYR Miner",
-            "iconUrl": ICON_URL,
-        }
-    )
+    return JSONResponse({
+        "url": WEBAPP_URL,
+        "name": "ZYR Miner",
+        "iconUrl": ICON_URL,
+    })
 
 
 # ============================================================
@@ -436,9 +413,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 Invite friends for +300 ZYR\n\n"
         f"👇 **Tap below to start!**"
     )
-    keyboard = [
-        [InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]
-    ]
+    keyboard = [[InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]]
     await update.message.reply_text(
         welcome_text,
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -449,11 +424,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     parts = query.data.split("_")
     if len(parts) < 4:
         return
-
     action, wd_id, user_id = parts[0], parts[1], parts[2]
     try:
         amount = float(parts[3])
@@ -462,22 +435,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn = get_db()
     c = conn.cursor()
-
     if action == "approve":
         c.execute("UPDATE withdrawals SET status='approved' WHERE id=?", (wd_id,))
-        await query.edit_message_text(
-            text=f"✅ Approved {amount} ZYR for user {user_id}."
-        )
+        await query.edit_message_text(text=f"✅ Approved {amount} ZYR for user {user_id}.")
     elif action == "reject":
-        c.execute(
-            "UPDATE users SET balance = balance + ? WHERE id=?",
-            (amount, user_id),
-        )
+        c.execute("UPDATE users SET balance = balance + ? WHERE id=?", (amount, user_id))
         c.execute("UPDATE withdrawals SET status='rejected' WHERE id=?", (wd_id,))
-        await query.edit_message_text(
-            text=f"❌ Rejected {amount} ZYR. Funds returned."
-        )
-
+        await query.edit_message_text(text=f"❌ Rejected {amount} ZYR. Funds returned.")
     conn.commit()
     conn.close()
 
