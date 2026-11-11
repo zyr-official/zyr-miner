@@ -1,26 +1,27 @@
 import os
 import sqlite3
 import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, WebAppInfo
+from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
 # ====== تنظیمات ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
-CHANNEL_ID = "@ZYRMining" 
+CHANNEL_ID = "@ZYRMining"
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "zyr_secret_change_me")
+DB_PATH = os.getenv("DB_PATH", "/tmp/zyr.db")
 # =====================
-
-app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # --- دیتابیس ---
 def get_db():
-    conn = sqlite3.connect('/tmp/zyr.db')
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -28,20 +29,24 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY, 
+        id TEXT PRIMARY KEY,
         first_name TEXT,
-        balance REAL DEFAULT 0, 
+        balance REAL DEFAULT 0,
         referrer_id TEXT,
         referral_earned REAL DEFAULT 0,
         has_paid INTEGER DEFAULT 0,
         last_mining REAL DEFAULT 0
     )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, amount REAL, address TEXT, status TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT, amount REAL, address TEXT, status TEXT
+    )''')
     conn.commit()
     conn.close()
+
 init_db()
 
-# --- مدل‌های داده ---
+# --- مدل‌ها ---
 class UserSyncRequest(BaseModel):
     user_id: str
     first_name: str
@@ -56,66 +61,100 @@ class WithdrawRequest(BaseModel):
 class MemberCheckRequest(BaseModel):
     user_id: str
 
-# --- API بررسی عضویت در کانال ---
+class ConfirmPaymentRequest(BaseModel):
+    user_id: str
+    tx_hash: str | None = None
+
+# --- ربات ---
+telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
+
+# --- FastAPI ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await telegram_app.initialize()
+    await telegram_app.start()
+    yield
+    await telegram_app.stop()
+    await telegram_app.shutdown()
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- API: بررسی عضویت ---
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
+    print(f"[CHECK-MEMBER] user={req.user_id}")
     bot = Bot(token=BOT_TOKEN)
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(req.user_id))
-        if member.status in ['member', 'administrator', 'creator']:
+        print(f"[CHECK-MEMBER] status={member.status}")
+        if member.status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.CREATOR,
+        ):
             return {"isMember": True}
         return {"isMember": False}
     except Exception as e:
+        print(f"[CHECK-MEMBER] ERROR: {type(e).__name__}: {e}")
         return {"isMember": False, "error": str(e)}
 
-# --- API سینک کردن کاربر (ورود اولیه) ---
+# --- API: سینک کاربر ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
-    
+
     if not user:
-        c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
-                  (req.user_id, req.first_name, req.referrer_id, time.time()))
+        c.execute(
+            "INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)",
+            (req.user_id, req.first_name, req.referrer_id, time.time())
+        )
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
-    
-    # ✅ شرط ادمین: اگر آیدی با آیدی ادمین یکی بود، خودکار پرداخت شده حساب میشه
+
     if req.user_id == str(ADMIN_ID) and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
         user = c.fetchone()
-    
+
     c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
     invited_count = c.fetchone()['count']
-    
+
     if invited_count >= 20:
-        rate_per_day = 150
-        level = 4
+        rate_per_day, level = 150, 4
     elif invited_count >= 10:
-        rate_per_day = 130
-        level = 3
+        rate_per_day, level = 130, 3
     elif invited_count >= 5:
-        rate_per_day = 110
-        level = 2
+        rate_per_day, level = 110, 2
     else:
-        rate_per_day = 80 
-        level = 1
-    
+        rate_per_day, level = 80, 1
+
     tokens_per_second = rate_per_day / 86400
-    
-    time_diff = time.time() - user['last_mining']
-    earned = time_diff * tokens_per_second
-    new_balance = user['balance'] + earned
-    
-    c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
+    last_mining = user['last_mining'] or time.time()
+    time_diff = max(0, time.time() - last_mining)
+
+    if user['has_paid']:
+        earned = time_diff * tokens_per_second
+        new_balance = user['balance'] + earned
+    else:
+        new_balance = user['balance']
+
+    c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?",
+              (new_balance, time.time(), req.user_id))
     conn.commit()
-    
     conn.close()
+
     return {
         "balance": round(new_balance, 5),
         "has_paid": bool(user['has_paid']),
@@ -125,40 +164,51 @@ async def sync_user(req: UserSyncRequest):
         "level": level
     }
 
-# --- API ثبت پرداخت (تاییدیه) ---
+# --- API: تأیید پرداخت ---
 @app.post("/confirm-payment")
-async def confirm_payment(req: MemberCheckRequest):
+async def confirm_payment(req: ConfirmPaymentRequest):
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
-    
-    if user and not user['has_paid']:
-        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
-        
-        if user['referrer_id']:
-            c.execute("UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
-        
-        conn.commit()
-        conn.close()
-        return {"ok": True, "message": "Payment confirmed"}
-        
-    conn.close()
-    return {"ok": False, "message": "Already paid or user not found"}
 
-# --- API برداشت ---
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user['has_paid']:
+        conn.close()
+        return {"ok": False, "message": "Already paid"}
+
+    c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?",
+              (time.time(), req.user_id))
+
+    if user['referrer_id']:
+        c.execute(
+            "UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?",
+            (user['referrer_id'],)
+        )
+
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "Payment confirmed"}
+
+# --- API: برداشت ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT balance FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
-    
+
     if not user or user['balance'] < req.amount:
         conn.close()
         raise HTTPException(status_code=400, detail="Insufficient balance")
-        
-    c.execute("INSERT INTO withdrawals (user_id, amount, address, status) VALUES (?, ?, ?, 'pending')", (req.user_id, req.amount, req.address))
+
+    c.execute(
+        "INSERT INTO withdrawals (user_id, amount, address, status) VALUES (?, ?, ?, 'pending')",
+        (req.user_id, req.amount, req.address)
+    )
     c.execute("UPDATE users SET balance = balance - ? WHERE id=?", (req.amount, req.user_id))
     wd_id = c.lastrowid
     conn.commit()
@@ -169,13 +219,19 @@ async def request_withdraw(req: WithdrawRequest):
             f"👤 User: {req.username} (`{req.user_id}`)\n"
             f"💰 Amount: {req.amount} ZYR\n"
             f"📫 Address: `{req.address}`")
-    
+
     keyboard = [[
         InlineKeyboardButton("✅ Approve", callback_data=f"approve_{wd_id}_{req.user_id}_{req.amount}"),
         InlineKeyboardButton("❌ Reject", callback_data=f"reject_{wd_id}_{req.user_id}_{req.amount}")
     ]]
-    
-    await bot.send_message(chat_id=ADMIN_ID, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+
+    try:
+        await bot.send_message(chat_id=ADMIN_ID, text=text,
+                               reply_markup=InlineKeyboardMarkup(keyboard),
+                               parse_mode='Markdown')
+    except Exception as e:
+        print(f"[WITHDRAW] admin notify error: {e}")
+
     return {"ok": True}
 
 @app.get("/tonconnect-manifest.json")
@@ -186,18 +242,19 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
-# --- ربات تلگرام ---
-telegram_app = Application.builder().token(BOT_TOKEN).build()
-
+# --- هندلرها ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or not update.message:
+        return
     user_name = update.effective_user.first_name or "Miner"
     ref_id = None
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
+
     url = WEBAPP_URL
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
-        
+
     welcome_text = (
         f"⚡ **Welcome to ZYR Cloud Miner, {user_name}!**\n\n"
         f"⛏️ **Mine ZYR inside the app:** Start your session, claim tokens, and withdraw to TON.\n"
@@ -205,16 +262,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 **Invite friends:** Boost your mining rate (up to 150 ZYR/day) and earn 300 ZYR per friend.\n\n"
         f"👇 **Tap below to start!**"
     )
-    keyboard = [[ InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url)) ]]
-    await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-
-telegram_app.add_handler(CommandHandler("start", start_command))
+    keyboard = [[InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]]
+    await update.message.reply_text(welcome_text,
+                                    reply_markup=InlineKeyboardMarkup(keyboard),
+                                    parse_mode='Markdown')
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data.split("_")
-    action, wd_id, user_id, amount = data[0], data[1], data[2], float(data[3])
+    try:
+        parts = query.data.split("_", 3)
+        action, wd_id, user_id, amount_str = parts[0], parts[1], parts[2], parts[3]
+        amount = float(amount_str)
+    except Exception:
+        await query.edit_message_text("❌ Invalid callback data.")
+        return
+
     conn = get_db()
     c = conn.cursor()
     if action == "approve":
@@ -227,18 +290,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
+telegram_app.add_handler(CommandHandler("start", start_command))
 telegram_app.add_handler(CallbackQueryHandler(handle_callback))
 
-@app.on_event("startup")
-async def on_startup():
-    await telegram_app.initialize()
-    await telegram_app.start()
-
+# --- Webhook ---
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
+    if WEBHOOK_SECRET:
+        token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if token != WEBHOOK_SECRET:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    try:
+        data = await request.json()
+        update = Update.de_json(data, telegram_app.bot)
+        await telegram_app.process_update(update)
+    except Exception as e:
+        print(f"[WEBHOOK] error: {e}")
     return {"ok": True}
 
 @app.get("/")
