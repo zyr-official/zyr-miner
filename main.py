@@ -163,10 +163,12 @@ async def sync_user(req: UserSyncRequest):
     c.execute("SELECT * FROM users WHERE id=?", (uid,))
     user = c.fetchone()
 
+    current_time = time.time()
+
     if not user:
         c.execute(
             "INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)",
-            (uid, req.first_name, req.referrer_id, time.time())
+            (uid, req.first_name, req.referrer_id, current_time)
         )
         if req.referrer_id:
             c.execute("SELECT id FROM users WHERE substr(id, -6) = ? COLLATE NOCASE", (req.referrer_id,))
@@ -201,12 +203,11 @@ async def sync_user(req: UserSyncRequest):
         rate_per_day, level = 80, 1
 
     tokens_per_second = rate_per_day / 86400
-    last_mining = user['last_mining'] or time.time()
-    time_diff = max(0, time.time() - last_mining)
+    last_mining = user['last_mining'] or current_time
+    time_diff = max(0, current_time - last_mining)
 
-    # توجه: در این نسخه موجودی اصلی در زمان سینک اتوماتیک اضافه نمی‌شود تا با کلایم دستی تداخل نکند
-    # موجودی فقط هنگام زدن دکمه کلایم آپدیت می‌شود.
-    new_balance = user['balance']
+    # محاسبه مقدار Unclaimed Mined در سرور بر اساس زمان گذشته تا بسته نشدن و صفر شدن شمارنده با بستن مینی‌اپ
+    pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
     friends_rows = c.fetchall()
@@ -222,7 +223,8 @@ async def sync_user(req: UserSyncRequest):
     conn.close()
 
     return {
-        "balance": round(new_balance, 5),
+        "balance": round(user['balance'], 5),
+        "pending_mined": round(pending_mined, 5),
         "has_paid": bool(user['has_paid']),
         "invited": invited_count,
         "active_invited": active_invited_count,
@@ -245,6 +247,7 @@ async def claim_mining(req: ClaimMiningRequest):
         raise HTTPException(status_code=404, detail="User not found")
         
     new_balance = user['balance'] + req.amount
+    # آپدیت موجودی و ریست کردن زمان آخرین ماین به زمان حال (برای شروع مجدد شمارنده از صفر)
     c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, time.time(), uid))
     conn.commit()
     conn.close()
