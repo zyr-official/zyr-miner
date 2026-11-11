@@ -16,7 +16,6 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes, Comman
 # ====== تنظیمات ======
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
 ADMIN_ID = 1839907139
-# تنظیم دقیق روی app.html مطابق با گیت‌هاب شما
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "zyr_secret_change_me")
