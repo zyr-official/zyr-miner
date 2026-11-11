@@ -332,6 +332,10 @@
         const data = await res.json();
 
         serverBalance = data.balance;
+        if (data.pending_mined !== undefined) {
+            pendingMined = data.pending_mined;
+        }
+
         document.getElementById('invited-count').textContent = data.invited || 0;
         document.getElementById('active-count').textContent = `${data.active_invited || 0} active`;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned || 0}`;
@@ -521,7 +525,7 @@
       initTonConnect();
 
       if (syncInterval) clearInterval(syncInterval);
-      syncInterval = setInterval(syncUser, 10000);
+      syncInterval = setInterval(syncUser, 15000);
 
       startLiveAnimation();
     }
@@ -533,7 +537,7 @@
       const btn = document.getElementById('btn-claim');
       btn.disabled = true;
       const originalHtml = btn.innerHTML;
-      btn.innerHTML = '⏳ Processing...';
+      btn.innerHTML = '⏳ Claiming...';
 
       try {
           const res = await fetch(BACKEND + '/claim-mining', {
@@ -564,7 +568,6 @@
           btn.innerHTML = originalHtml;
           btn.disabled = false;
       }
-      syncUser();
     }
 
     function showScreen(id) {
