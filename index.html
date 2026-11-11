@@ -103,7 +103,7 @@
     .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; width: 60px; }
     .nav-btn.active { color: var(--primary); }
     .nav-btn svg { width: 22px; height: 22px; fill: currentColor; }
-    .nav-main { width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; display: flex; align-items: center; justify-content: center; transform: translateY(-20px); box-shadow: 0 10px 25px var(--primary-glow); border: 4px solid var(--bg); pointer-events: none; }
+    .nav-main { width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; display: flex; align-items: center; justify-content: center; transform: translateY(-20px); box-shadow: 0 10px 25px var(--primary-glow); border: 4px solid var(--bg); cursor: pointer; }
     .nav-main svg { width: 26px; height: 26px; }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
   </style>
@@ -261,7 +261,7 @@
     <div class="nav-btn" id="nav-friends" onclick="switchTab('friends')">
       <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> Friends
     </div>
-    <div class="nav-main">
+    <div class="nav-main" onclick="switchTab('mining')">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
     </div>
     <div class="nav-btn" id="nav-withdraw" onclick="switchTab('withdraw')">
@@ -281,6 +281,7 @@
     let pendingMined = 0;
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
+    let isClaiming = false;
 
     const tgUser = tg.initDataUnsafe?.user || {};
     let userId = tgUser.id ? tgUser.id.toString() : null;
@@ -317,6 +318,7 @@
     }
 
     async function syncUser() {
+      if (isClaiming) return; // جلوگیری از تداخل موقع کلایم کردن
       try {
         const res = await fetch(BACKEND + '/sync-user', {
             method: 'POST',
@@ -332,9 +334,7 @@
         const data = await res.json();
 
         serverBalance = data.balance;
-        if (data.pending_mined !== undefined) {
-            pendingMined = data.pending_mined;
-        }
+        pendingMined = data.pending_mined || 0;
 
         document.getElementById('invited-count').textContent = data.invited || 0;
         document.getElementById('active-count').textContent = `${data.active_invited || 0} active`;
@@ -353,7 +353,7 @@
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
-        if (data.has_paid && !document.getElementById('screen-dashboard').classList.contains('active')) {
+        if (data.has_paid && !document.getElementById('screen-dashboard').classList.contains('active') && !document.getElementById('screen-friends').classList.contains('active') && !document.getElementById('screen-withdraw').classList.contains('active')) {
             startApp();
         }
 
@@ -531,8 +531,9 @@
     }
 
     async function claimTokens() {
-      if (pendingMined <= 0) return;
+      if (pendingMined <= 0 || isClaiming) return;
       
+      isClaiming = true;
       const claimAmount = pendingMined;
       const btn = document.getElementById('btn-claim');
       btn.disabled = true;
@@ -558,6 +559,7 @@
               setTimeout(() => { 
                   btn.innerHTML = originalHtml; 
                   btn.disabled = false;
+                  isClaiming = false;
               }, 2000);
           } else {
               throw new Error(data.message || 'Failed to claim');
@@ -567,6 +569,7 @@
           alert('❌ Error claiming tokens. Please try again.');
           btn.innerHTML = originalHtml;
           btn.disabled = false;
+          isClaiming = false;
       }
     }
 
@@ -578,13 +581,13 @@
 
     function switchTab(tab) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      
       if (tab === 'mining') {
         showScreen('screen-dashboard');
         document.getElementById('nav-mining').classList.add('active');
       } else if (tab === 'friends') {
         showScreen('screen-friends');
         document.getElementById('nav-friends').classList.add('active');
-        syncUser();
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
