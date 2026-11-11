@@ -353,7 +353,7 @@
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
-        if (data.has_paid && !document.getElementById('screen-dashboard').classList.contains('active') && !document.getElementById('screen-friends').classList.contains('active') && !document.getElementById('screen-withdraw').classList.contains('active')) {
+        if (data.has_paid) {
             startApp();
         }
 
@@ -491,17 +491,31 @@
         st.textContent = '⏳ Verifying payment...';
         st.className = 'status ok';
 
-        await fetch(BACKEND + '/confirm-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, init_data: initData })
-        });
+        // تلاش برای تایید پرداخت با چند بار تکرار در صورت تاخیر شبکه
+        let paidConfirmed = false;
+        for (let i = 0; i < 3; i++) {
+            try {
+                const payRes = await fetch(BACKEND + '/confirm-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, init_data: initData })
+                });
+                if (payRes.ok) {
+                    paidConfirmed = true;
+                    break;
+                }
+            } catch (err) {
+                console.log('Retry confirm payment...', err);
+            }
+            await new Promise(r => setTimeout(r, 2000));
+        }
 
         const data = await syncUser();
-        if (data?.has_paid) {
+        if (data?.has_paid || paidConfirmed) {
             startApp();
         } else {
-            st.textContent = '⚠️ Payment recorded, sync delayed.';
+            st.textContent = '⚠️ Payment recorded, please restart app.';
+            setTimeout(() => startApp(), 2000);
         }
       } catch (e) {
         st.textContent = '❌ Cancelled or failed.';
@@ -552,7 +566,7 @@
           try {
               data = JSON.parse(textResponse);
           } catch (err) {
-              throw new Error("پاسخ سرور نامعتبر است: " + textResponse.substring(0, 50));
+              throw new Error("پاسخ سرور نامعتبر است");
           }
           
           if (res.ok && data.ok) {
