@@ -204,15 +204,9 @@ async def sync_user(req: UserSyncRequest):
     last_mining = user['last_mining'] or time.time()
     time_diff = max(0, time.time() - last_mining)
 
-    if user['has_paid']:
-        earned = time_diff * tokens_per_second
-        new_balance = user['balance'] + earned
-    else:
-        new_balance = user['balance']
-
-    c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?",
-              (new_balance, time.time(), uid))
-    conn.commit()
+    # توجه: در این نسخه موجودی اصلی در زمان سینک اتوماتیک اضافه نمی‌شود تا با کلایم دستی تداخل نکند
+    # موجودی فقط هنگام زدن دکمه کلایم آپدیت می‌شود.
+    new_balance = user['balance']
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
     friends_rows = c.fetchall()
@@ -243,10 +237,18 @@ async def claim_mining(req: ClaimMiningRequest):
     uid = resolve_user_id(req)
     conn = get_db()
     c = conn.cursor()
-    c.execute("UPDATE users SET balance = balance + ?, last_mining = ? WHERE id = ?", (req.amount, time.time(), uid))
+    c.execute("SELECT balance FROM users WHERE id=?", (uid,))
+    user = c.fetchone()
+    
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    new_balance = user['balance'] + req.amount
+    c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, time.time(), uid))
     conn.commit()
     conn.close()
-    return {"ok": True}
+    return {"ok": True, "new_balance": new_balance}
 
 @app.post("/confirm-payment")
 async def confirm_payment(req: ConfirmPaymentRequest):
