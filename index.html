@@ -27,31 +27,33 @@
     .status.ok { color: var(--primary); }
     .status.err { color: #ff4757; }
     .app { padding: 24px 20px; }
-    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .profile { display: flex; align-items: center; gap: 12px; }
     .profile-img { width: 48px; height: 48px; border-radius: 50%; background: var(--surface); border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 15px var(--primary-glow); }
     .profile-img img { width: 100%; height: 100%; object-fit: cover; }
     .profile-name h2 { font-size: 17px; font-weight: 700; }
     .profile-name p { font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.5px; }
     
-    /* Ton Connect Top Header Button */
-    #ton-connect-button { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+    #ton-connect-container { display: flex; justify-content: center; width: 100%; margin-bottom: 20px; }
+    #ton-connect-button { width: 100%; display: flex; justify-content: center; }
+    #ton-connect-button > div { width: 100% !important; max-width: 100% !important; }
 
     .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 36px; padding: 30px 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 20px; backdrop-filter: blur(30px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
     .balance-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-weight: 600; }
     .balance-amount { font-size: 42px; font-weight: 700; letter-spacing: -2px; display: flex; justify-content: center; align-items: baseline; gap: 6px; }
     .balance-amount span { font-size: 18px; color: var(--primary); font-weight: 700; }
+    .balance-ton { font-size: 14px; color: var(--muted); margin-top: 8px; }
 
-    .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); }
+    .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); }
     .engine-info { display: flex; flex-direction: column; gap: 6px; }
     .engine-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
     .engine-status .pulse { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: blink 0.8s infinite; }
     .engine-rate { font-size: 22px; font-weight: 700; color: var(--text); }
     .engine-rate span { font-size: 13px; color: var(--muted); font-weight: 500; }
     
-    .live-mining-box { background: rgba(0, 212, 255, 0.05); border: 1px dashed rgba(0, 212, 255, 0.3); border-radius: 20px; padding: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .live-mining-title { font-size: 13px; color: var(--muted); font-weight: 500; }
-    .live-mining-amount { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .live-mining-box { background: rgba(0, 212, 255, 0.05); border: 1px dashed rgba(0, 212, 255, 0.3); border-radius: 20px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .live-mining-title { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+    .live-mining-amount { font-size: 24px; font-weight: 700; color: var(--primary); }
 
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 8px; backdrop-filter: blur(10px); }
@@ -79,8 +81,13 @@
     .stat-box-value { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
     .stat-box-sub { font-size: 11px; color: var(--primary); font-weight: 600; }
 
-    .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 16px; color: #fff; font-family: monospace; font-size: 14px; margin-bottom: 16px; outline: none; }
+    .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 16px; color: #fff; font-family: monospace; font-size: 14px; margin-bottom: 12px; outline: none; }
     .input-field:focus { border-color: var(--primary); }
+
+    /* استایل دکمه‌های درصدی (25%, 50%, 80%, MAX) */
+    .percent-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .pct-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 0; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; text-align: center; }
+    .pct-btn:active { background: rgba(0, 212, 255, 0.15); transform: scale(0.95); }
 
     .bottom-nav { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 100px; display: flex; justify-content: space-around; align-items: center; padding: 12px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
     .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; width: 60px; }
@@ -128,22 +135,25 @@
         </div>
       </div>
 
-      <!-- دکمه اتصال ولت در بالای صفحه داشبورد -->
-      <div id="ton-connect-button"></div>
-
-      <!-- موجودی کل (اصلی) بالای صفحه -->
-      <div class="balance-section">
-        <div class="balance-title">Total Balance</div>
-        <div class="balance-amount"><span id="main-balance">0.00000</span> <span>ZYR</span></div>
+      <!-- دکمه اتصال کیف پول بالای صفحه -->
+      <div id="ton-connect-container">
+        <div id="ton-connect-button"></div>
       </div>
 
-      <!-- بخش ماینینگ زنده که تندتند بالا می‌رود -->
+      <!-- موجودی کل (اصلی) در کادر بزرگ بالا -->
+      <div class="balance-section">
+        <div class="balance-title">Total Mined</div>
+        <div class="balance-amount"><span id="main-balance">0.00000</span> <span>ZYR</span></div>
+        <div class="balance-ton" id="ton-value">≈ 0.0000 TON</div>
+      </div>
+
+      <!-- بخش ماینینگ لحظه‌ای -->
       <div class="live-mining-box">
         <div>
-          <div class="live-mining-title">Mined (Unclaimed)</div>
+          <div class="live-mining-title">Unclaimed Mined</div>
           <div class="live-mining-amount">+<span id="pending-display">0.00000</span> ZYR</div>
         </div>
-        <div class="engine-status"><div class="pulse"></div> Active</div>
+        <div class="engine-status"><div class="pulse"></div> Live</div>
       </div>
 
       <div class="mining-engine">
@@ -158,14 +168,14 @@
         <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
       </div>
 
-      <!-- دکمه کلایم که موجودی لحظه‌ای را صفر کرده و به موجودی کل منتقل می‌کند -->
+      <!-- دکمه کلایم -->
       <button class="claim-action" id="btn-claim" onclick="claimTokens()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR
       </button>
     </div>
   </div>
 
-  <!-- صفحه دوستان (Friends) با لینک دعوت صحیح ربات -->
+  <!-- صفحه دوستان (Friends) -->
   <div class="screen" id="screen-friends">
     <div class="app">
       <div class="friends-header" style="margin-top: 10px;"><h1>Friends</h1><p>Invite friends and earn 300 ZYR when they activate their miner.</p></div>
@@ -190,7 +200,7 @@
     </div>
   </div>
 
-  <!-- صفحه برداشت (Withdraw) -->
+  <!-- صفحه برداشت (Withdraw) همراه با دکمه‌های 25%، 50%، 80% و Max -->
   <div class="screen" id="screen-withdraw">
     <div class="app">
       <div class="friends-header" style="margin-top: 10px;"><h1>Withdraw ZYR</h1><p>Convert your mined ZYR tokens to TON.</p></div>
@@ -201,8 +211,18 @@
       <div class="ref-box">
         <div class="ref-label">TON Wallet Address</div>
         <input type="text" id="wd-address" class="input-field" placeholder="UQ...">
+        
         <div class="ref-label">Amount (ZYR)</div>
-        <input type="number" id="wd-amount" class="input-field" placeholder="10000">
+        <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
+        
+        <!-- دکمه‌های درصدی اضافه شده دقیقاً در محل درخواست‌شده -->
+        <div class="percent-buttons">
+          <button class="pct-btn" onclick="setWithdrawPercent(0.25)">25%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.50)">50%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.80)">80%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(1.00)">MAX</button>
+        </div>
+
         <button class="btn btn-primary" onclick="requestWithdraw()" style="max-width: 100%;">Request Withdrawal</button>
         <div class="status" id="status-wd" style="text-align: center;"></div>
       </div>
@@ -245,7 +265,7 @@
 
     let tonConnectUI, syncInterval, animateInterval;
     let serverBalance = 0;
-    let pendingMined = 0; // مقدار لحظه‌ای که تندتند بالا می‌رود
+    let pendingMined = 0;
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
 
@@ -253,8 +273,6 @@
     const userId = tgUser.id.toString();
     const initData = tg.initData || '';
     const myRefCode = userId.slice(-6).toUpperCase();
-    
-    // اصلاح آیدی ربات در لینک دعوت
     const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
 
     let referrerId = null;
@@ -320,15 +338,14 @@
     function startLiveAnimation() {
         if (animateInterval) clearInterval(animateInterval);
         animateInterval = setInterval(() => {
-            pendingMined += tokensPerSecond * 0.1; // سرعت بالا رفتن لحظه‌ای
+            pendingMined += tokensPerSecond * 0.1;
             updateUI();
         }, 100);
     }
 
     function updateUI() {
-        // موجودی کل بالای صفحه
         document.getElementById('main-balance').textContent = serverBalance.toFixed(5);
-        // مقدار لحظه‌ای ماین شده
+        document.getElementById('ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
         document.getElementById('pending-display').textContent = pendingMined.toFixed(5);
     }
 
@@ -356,7 +373,7 @@
                     startApp();
                 } else {
                     showScreen('screen-pay');
-                    initTonConnect(); // فعال‌سازی ولت در صفحه پرداخت
+                    initTonConnect();
                 }
             }, 800);
         } else {
@@ -420,7 +437,6 @@
       document.getElementById('ref-code').textContent = myRefCode;
       document.getElementById('ref-link').textContent = myRefLink;
 
-      // مقداردهی و اتصال TonConnect در بالای داشبورد
       initTonConnect();
 
       if (syncInterval) clearInterval(syncInterval);
@@ -429,7 +445,6 @@
       startLiveAnimation();
     }
 
-    // دکمه Claim: صفر کردن مقدار لحظه‌ای و انتقال آن به موجودی اصلی کل بالای صفحه
     function claimTokens() {
       if (pendingMined <= 0) return;
       
@@ -444,7 +459,6 @@
       btn.innerHTML = '✅ Claimed & Added!';
       setTimeout(() => { btn.innerHTML = original; }, 2000);
 
-      // همگام‌سازی نهایی با سرور
       syncUser();
     }
 
@@ -465,8 +479,17 @@
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
-        document.getElementById('wd-balance').textContent = (serverBalance + pendingMined).toFixed(4);
+        const totalAvailable = serverBalance + pendingMined;
+        document.getElementById('wd-balance').textContent = totalAvailable.toFixed(4);
       }
+    }
+
+    // تابع محاسبه و قرار دادن مقدار درصدی در فیلد برداشت
+    function setWithdrawPercent(percentage) {
+      const totalAvailable = serverBalance + pendingMined;
+      const calculatedAmount = Math.floor(totalAvailable * percentage);
+      document.getElementById('wd-amount').value = calculatedAmount > 0 ? calculatedAmount : 0;
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
     }
 
     function copyRefLink() {
@@ -527,7 +550,7 @@
       } catch (e) {
         st.textContent = '❌ ' + e.message;
         st.className = 'status err';
-    }
+      }
     }
 
     syncUser();
