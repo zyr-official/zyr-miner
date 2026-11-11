@@ -9,7 +9,7 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; font-family: 'Space Grotesk', sans-serif; }
-    :root { --bg: #050505; --surface: rgba(255, 255, 255, 0.03); --surface-hover: rgba(255, 255, 255, 0.08); --primary: #00d4ff; --primary-glow: rgba(0, 212, 255, 0.4); --secondary: #7b2fff; --text: #ffffff; --muted: #888888; --border: rgba(255, 255, 255, 0.08); }
+    :root { --bg: #050505; --surface: rgba(255, 255, 255, 0.03); --surface-hover: rgba(255, 255, 255, 0.08); --primary: #00d4ff; --primary-glow: rgba(0, 212, 255, 0.4); --secondary: #7b2fff; --text: #ffffff; --muted: #888888; --border: rgba(255, 255, 255, 0.08); --orange: #ff9800; --green: #4caf50; }
     body { background-color: var(--bg); background-image: radial-gradient(circle at 15% 15%, rgba(123, 47, 255, 0.15) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(0, 212, 255, 0.1) 0%, transparent 40%); background-attachment: fixed; color: var(--text); min-height: 100vh; padding-bottom: 110px; overflow-x: hidden; }
     .screen { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
     .screen.active { display: block; }
@@ -40,8 +40,8 @@
 
     .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 36px; padding: 30px 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 20px; backdrop-filter: blur(30px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
     .balance-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-weight: 600; }
-    .balance-amount { font-size: 42px; font-weight: 700; letter-spacing: -2px; display: flex; justify-content: center; align-items: baseline; gap: 6px; }
-    .balance-amount span { font-size: 18px; color: var(--primary); font-weight: 700; }
+    .balance-amount { font-size: 36px; font-weight: 700; letter-spacing: -1px; display: flex; justify-content: center; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .balance-amount .unit { font-size: 20px; color: var(--primary); font-weight: 700; margin-left: 4px; }
     .balance-ton { font-size: 14px; color: var(--muted); margin-top: 8px; }
 
     .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); }
@@ -53,7 +53,7 @@
     
     .live-mining-box { background: rgba(0, 212, 255, 0.05); border: 1px dashed rgba(0, 212, 255, 0.3); border-radius: 20px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .live-mining-title { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
-    .live-mining-amount { font-size: 24px; font-weight: 700; color: var(--primary); }
+    .live-mining-amount { font-size: 22px; font-weight: 700; color: var(--primary); display: flex; gap: 6px; align-items: baseline; }
 
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 8px; backdrop-filter: blur(10px); }
@@ -63,10 +63,10 @@
     .claim-action { width: 100%; padding: 20px; border: none; border-radius: 24px; background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); border: 1px solid rgba(0,212,255,0.4); color: var(--primary); font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.1); }
     .claim-action:active { transform: scale(0.97); }
 
-    .friends-header { margin-bottom: 20px; }
+    .friends-header { margin-bottom: 16px; }
     .friends-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
-    .friends-header p { color: var(--muted); font-size: 14px; line-height: 1.5; }
-    .info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .friends-header p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; font-size: 12px; color: var(--muted); line-height: 1.6; }
     .action-row { display: flex; gap: 12px; margin-bottom: 16px; }
     .action-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 100px; padding: 14px; color: var(--text); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
     .ref-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-bottom: 16px; }
@@ -75,6 +75,18 @@
     .ref-code { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
     .ref-badge { background: rgba(0,212,255,0.1); color: var(--primary); border: 1px solid rgba(0,212,255,0.3); padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
     .ref-link { background: rgba(0,0,0,0.4); padding: 12px; border-radius: 12px; font-size: 12px; color: var(--primary); word-break: break-all; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); }
+    
+    /* استایل لیست دوستان */
+    .friends-list-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
+    .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .friend-item:last-child { border-bottom: none; }
+    .friend-info { display: flex; flex-direction: column; gap: 2px; }
+    .friend-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .friend-status { font-size: 11px; font-weight: 600; }
+    .status-pending { color: var(--orange); }
+    .status-active { color: var(--green); }
+    .friend-claim-btn { background: var(--green); color: #fff; border: none; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
+
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; }
     .stat-box-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
@@ -84,7 +96,6 @@
     .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 16px; color: #fff; font-family: monospace; font-size: 14px; margin-bottom: 12px; outline: none; }
     .input-field:focus { border-color: var(--primary); }
 
-    /* استایل دکمه‌های درصدی (25%, 50%, 80%, MAX) */
     .percent-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
     .pct-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 0; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; text-align: center; }
     .pct-btn:active { background: rgba(0, 212, 255, 0.15); transform: scale(0.95); }
@@ -100,7 +111,6 @@
 </head>
 <body>
 
-  <!-- صفحه عضویت در کانال -->
   <div class="screen active" id="screen-join">
     <div class="onboarding">
       <div class="icon-box">⚡</div>
@@ -112,7 +122,6 @@
     </div>
   </div>
 
-  <!-- صفحه پرداخت برای فعال‌سازی -->
   <div class="screen" id="screen-pay">
     <div class="onboarding">
       <div class="icon-box" style="background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,212,255,0.05)); border-color: rgba(0,212,255,0.4); color: var(--primary);">💎</div>
@@ -125,7 +134,6 @@
     </div>
   </div>
 
-  <!-- داشبورد اصلی ماینینگ -->
   <div class="screen" id="screen-dashboard">
     <div class="app">
       <div class="top-bar">
@@ -135,23 +143,20 @@
         </div>
       </div>
 
-      <!-- دکمه اتصال کیف پول بالای صفحه -->
       <div id="ton-connect-container">
         <div id="ton-connect-button"></div>
       </div>
 
-      <!-- موجودی کل (اصلی) در کادر بزرگ بالا -->
       <div class="balance-section">
         <div class="balance-title">Total Mined</div>
-        <div class="balance-amount"><span id="main-balance">0.00000</span> <span>ZYR</span></div>
+        <div class="balance-amount"><span id="main-balance">0.00000</span> <span class="unit">ZYR</span></div>
         <div class="balance-ton" id="ton-value">≈ 0.0000 TON</div>
       </div>
 
-      <!-- بخش ماینینگ لحظه‌ای -->
       <div class="live-mining-box">
         <div>
           <div class="live-mining-title">Unclaimed Mined</div>
-          <div class="live-mining-amount">+<span id="pending-display">0.00000</span> ZYR</div>
+          <div class="live-mining-amount">+<span id="pending-display">0.00000</span> <span style="font-size: 14px; font-weight:700;">ZYR</span></div>
         </div>
         <div class="engine-status"><div class="pulse"></div> Live</div>
       </div>
@@ -168,45 +173,60 @@
         <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
       </div>
 
-      <!-- دکمه کلایم -->
       <button class="claim-action" id="btn-claim" onclick="claimTokens()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR
       </button>
     </div>
   </div>
 
-  <!-- صفحه دوستان (Friends) -->
+  <!-- صفحه دوستان آپدیت‌شده -->
   <div class="screen" id="screen-friends">
     <div class="app">
-      <div class="friends-header" style="margin-top: 10px;"><h1>Friends</h1><p>Invite friends and earn 300 ZYR when they activate their miner.</p></div>
+      <div class="friends-header" style="margin-top: 10px;">
+        <h1>Friends</h1>
+        <p>Invite friends and earn 300 ZYR when they pay 0.1 TON!</p>
+      </div>
+      
+      <!-- راهنمای لول‌ها و شرایط ۳۰۰ توکن -->
       <div class="info-box">
         <strong>Boost Levels:</strong><br>
-        Level 1: 80 ZYR/day | Level 2: 110 ZYR/day<br>
-        Level 3: 130 ZYR/day | Level 4: 150 ZYR/day
+        • Level 1 (0 invited): 80 ZYR/day<br>
+        • Level 2 (3 invited): 110 ZYR/day<br>
+        • Level 3 (6 invited): 130 ZYR/day<br>
+        • Level 4 (10 invited): 150 ZYR/day<br><br>
+        <span style="color: var(--primary);">💡 Note: When your referral pays 0.1 TON, you get 300 ZYR!</span>
       </div>
+
       <div class="action-row">
         <button class="action-btn" onclick="copyRefLink()">Copy Link</button>
         <button class="action-btn" onclick="shareRefLink()">Share</button>
       </div>
+
       <div class="ref-box">
         <div class="ref-label">Your referral code</div>
         <div class="ref-code-row"><div class="ref-code" id="ref-code">LOADING...</div><div class="ref-badge">300 ZYR</div></div>
         <div class="ref-link" id="ref-link">https://t.me/...</div>
       </div>
-      <div class="stats-grid">
+
+      <!-- لیست دوستان دعوت‌شده با وضعیت رنگی و دکمه کلایم پاداش هر دوست -->
+      <div class="ref-label">Your Invited Friends</div>
+      <div class="friends-list-box" id="friends-list-container">
+        <div style="text-align: center; color: var(--muted); font-size: 12px; padding: 10px;">No friends invited yet.</div>
+      </div>
+
+      <div class="stats-grid" style="margin-top: 16px;">
         <div class="stat-box"><div class="stat-box-label">Invited</div><div class="stat-box-value" id="invited-count">0</div><div class="stat-box-sub" id="active-count">0 active</div></div>
         <div class="stat-box"><div class="stat-box-label">Earned</div><div class="stat-box-value" style="color: var(--primary);" id="earned-referral">+0.00</div><div class="stat-box-sub">ZYR earned</div></div>
       </div>
     </div>
   </div>
 
-  <!-- صفحه برداشت (Withdraw) همراه با دکمه‌های 25%، 50%، 80% و Max -->
   <div class="screen" id="screen-withdraw">
     <div class="app">
       <div class="friends-header" style="margin-top: 10px;"><h1>Withdraw ZYR</h1><p>Convert your mined ZYR tokens to TON.</p></div>
       <div class="balance-section" style="padding: 20px; margin-bottom: 20px;">
         <div class="balance-title">Available to Withdraw</div>
-        <div class="balance-amount" style="font-size: 32px;"><span id="wd-balance">0.0000</span> <span>ZYR</span></div>
+        <div class="balance-amount" style="font-size: 32px;"><span id="wd-balance">0.0000</span> <span class="unit">ZYR</span></div>
       </div>
       <div class="ref-box">
         <div class="ref-label">TON Wallet Address</div>
@@ -215,7 +235,6 @@
         <div class="ref-label">Amount (ZYR)</div>
         <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
         
-        <!-- دکمه‌های درصدی اضافه شده دقیقاً در محل درخواست‌شده -->
         <div class="percent-buttons">
           <button class="pct-btn" onclick="setWithdrawPercent(0.25)">25%</button>
           <button class="pct-btn" onclick="setWithdrawPercent(0.50)">50%</button>
@@ -229,7 +248,6 @@
     </div>
   </div>
 
-  <!-- صفحه در انتظار تایید برداشت -->
   <div class="screen" id="screen-pending">
     <div class="onboarding">
       <div class="icon-box" style="background: rgba(255, 193, 7, 0.1); border-color: rgba(255, 193, 7, 0.3); color: #ffc107;">⏳</div>
@@ -240,7 +258,6 @@
     </div>
   </div>
 
-  <!-- منوی پایین -->
   <div class="bottom-nav" id="main-nav" style="display: none;">
     <div class="nav-btn active" id="nav-mining" onclick="switchTab('mining')">
       <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Mining
@@ -269,8 +286,18 @@
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
 
-    const tgUser = tg.initDataUnsafe?.user || { id: '123456789', first_name: 'ZYR User' };
-    const userId = tgUser.id.toString();
+    const tgUser = tg.initDataUnsafe?.user || {};
+    let userId = tgUser.id ? tgUser.id.toString() : null;
+    if (!userId) {
+        let storedId = localStorage.getItem('zyr_test_user_id');
+        if (!storedId) {
+            storedId = Math.floor(100000000 + Math.random() * 900000000).toString();
+            localStorage.setItem('zyr_test_user_id', storedId);
+        }
+        userId = storedId;
+        if (!tgUser.first_name) tgUser.first_name = "Test Miner";
+    }
+
     const initData = tg.initData || '';
     const myRefCode = userId.slice(-6).toUpperCase();
     const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
@@ -300,7 +327,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_id: userId,
-                first_name: tgUser.first_name,
+                first_name: tgUser.first_name || "ZYR User",
                 referrer_id: referrerId,
                 init_data: initData
             })
@@ -309,8 +336,12 @@
         const data = await res.json();
 
         serverBalance = data.balance;
-        document.getElementById('invited-count').textContent = data.invited;
-        document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
+        document.getElementById('invited-count').textContent = data.invited || 0;
+        document.getElementById('active-count').textContent = `${data.active_invited || 0} active`;
+        document.getElementById('earned-referral').textContent = `+${data.referral_earned || 0}`;
+
+        // رندر کردن لیست دوستان با وضعیت نارنجی/سبز و دکمه کلایم پاداش رفرال
+        renderFriendsList(data.friends || []);
 
         if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
             currentRatePerDay = data.rate_per_day;
@@ -335,6 +366,63 @@
       }
     }
 
+    // تابع رندر لیست دوستان در تب Friends
+    function renderFriendsList(friends) {
+        const container = document.getElementById('friends-list-container');
+        if (!friends || friends.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: var(--muted); font-size: 12px; padding: 10px;">No friends invited yet.</div>`;
+            return;
+        }
+
+        let html = '';
+        friends.forEach(f => {
+            const hasPaid = f.has_paid;
+            const claimed = f.reward_claimed;
+            const statusClass = hasPaid ? 'status-active' : 'status-pending';
+            const statusText = hasPaid ? 'Active (0.1 TON Paid)' : 'Pending (No TON)';
+            
+            let actionBtn = '';
+            if (hasPaid && !claimed) {
+                actionBtn = `<button class="friend-claim-btn" onclick="claimRefReward('${f.id}')">Claim 300 ZYR</button>`;
+            } else if (claimed) {
+                actionBtn = `<span style="font-size: 11px; color: var(--primary);">Claimed ✅</span>`;
+            } else {
+                actionBtn = `<span style="font-size: 11px; color: var(--muted);">Waiting TON</span>`;
+            }
+
+            html += `
+              <div class="friend-item">
+                <div class="friend-info">
+                  <span class="friend-name">${f.name || 'User'}</span>
+                  <span class="friend-status ${statusClass}">${statusText}</span>
+                </div>
+                <div>${actionBtn}</div>
+              </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    // تابع کلایم پاداش رفرال از سرور
+    async function claimRefReward(friendId) {
+        try {
+            const res = await fetch(BACKEND + '/claim-ref-reward', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, friend_id: friendId, init_data: initData })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                syncUser();
+            } else {
+                alert(data.message || 'Error claiming reward');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     function startLiveAnimation() {
         if (animateInterval) clearInterval(animateInterval);
         animateInterval = setInterval(() => {
@@ -347,6 +435,11 @@
         document.getElementById('main-balance').textContent = serverBalance.toFixed(5);
         document.getElementById('ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
         document.getElementById('pending-display').textContent = pendingMined.toFixed(5);
+
+        const wdBalanceEl = document.getElementById('wd-balance');
+        if (wdBalanceEl && document.getElementById('screen-withdraw').classList.contains('active')) {
+            wdBalanceEl.textContent = (serverBalance + pendingMined).toFixed(4);
+        }
     }
 
     async function checkMembership() {
@@ -428,7 +521,7 @@
     function startApp() {
       showScreen('screen-dashboard');
       document.getElementById('main-nav').style.display = 'flex';
-      document.getElementById('user-name').textContent = tgUser.first_name;
+      document.getElementById('user-name').textContent = tgUser.first_name || "ZYR User";
       if (tgUser.photo_url) {
         const imgHtml = `<img src="${tgUser.photo_url}">`;
         document.getElementById('user-avatar').innerHTML = imgHtml;
@@ -476,6 +569,7 @@
       } else if (tab === 'friends') {
         showScreen('screen-friends');
         document.getElementById('nav-friends').classList.add('active');
+        syncUser(); // بارگذاری لیست دوستان با ورود به تب
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
@@ -484,7 +578,6 @@
       }
     }
 
-    // تابع محاسبه و قرار دادن مقدار درصدی در فیلد برداشت
     function setWithdrawPercent(percentage) {
       const totalAvailable = serverBalance + pendingMined;
       const calculatedAmount = Math.floor(totalAvailable * percentage);
@@ -533,7 +626,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_id: userId,
-                username: tgUser.first_name,
+                username: tgUser.first_name || "ZYR User",
                 amount: amount,
                 address: address,
                 init_data: initData
