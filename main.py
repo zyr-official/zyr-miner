@@ -1,7 +1,10 @@
 import os
 import sqlite3
 import time
+import hashlib
+import hmac
 from contextlib import asynccontextmanager
+from urllib.parse import parse_qsl
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -46,24 +49,64 @@ def init_db():
 
 init_db()
 
-# --- مدل‌ها ---
+# --- مدل‌ها (init_data اختیاری است) ---
 class UserSyncRequest(BaseModel):
     user_id: str
     first_name: str
     referrer_id: str | None = None
+    init_data: str | None = None
 
 class WithdrawRequest(BaseModel):
     user_id: str
     username: str
     amount: float
     address: str
+    init_data: str | None = None
 
 class MemberCheckRequest(BaseModel):
-    user_id: str
+    user_id: str | None = None
+    init_data: str | None = None
 
 class ConfirmPaymentRequest(BaseModel):
     user_id: str
     tx_hash: str | None = None
+    init_data: str | None = None
+
+# --- اعتبارسنجی init_data (اختیاری) ---
+def verify_init_data(init_data: str) -> str | None:
+    """اگر معتبر بود user_id را برمی‌گرداند، وگرنه None"""
+    if not init_data:
+        return None
+    try:
+        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+        received_hash = parsed.pop("hash", None)
+        if not received_hash:
+            return None
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, received_hash):
+            return None
+        # auth_date check (۱ روز اعتبار)
+        auth_date = int(parsed.get("auth_date", "0"))
+        if time.time() - auth_date > 86400:
+            return None
+        import json
+        user = json.loads(parsed.get("user", "{}"))
+        return str(user.get("id"))
+    except Exception as e:
+        print(f"[verify_init_data] {e}")
+        return None
+
+def resolve_user_id(req) -> str:
+    """user_id را از user_id مستقیم یا init_data معتبر استخراج می‌کند"""
+    if getattr(req, 'init_data', None):
+        verified = verify_init_data(req.init_data)
+        if verified:
+            return verified
+    if getattr(req, 'user_id', None):
+        return str(req.user_id)
+    raise HTTPException(status_code=400, detail="user_id or valid init_data required")
 
 # --- ربات ---
 telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
@@ -89,10 +132,11 @@ app.add_middleware(
 # --- API: بررسی عضویت ---
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
-    print(f"[CHECK-MEMBER] user={req.user_id}")
+    uid = resolve_user_id(req)
+    print(f"[CHECK-MEMBER] user={uid}")
     bot = Bot(token=BOT_TOKEN)
     try:
-        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(req.user_id))
+        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(uid))
         print(f"[CHECK-MEMBER] status={member.status}")
         if member.status in (
             ChatMemberStatus.MEMBER,
@@ -108,27 +152,28 @@ async def check_member(req: MemberCheckRequest):
 # --- API: سینک کاربر ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
+    uid = resolve_user_id(req)
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+    c.execute("SELECT * FROM users WHERE id=?", (uid,))
     user = c.fetchone()
 
     if not user:
         c.execute(
             "INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)",
-            (req.user_id, req.first_name, req.referrer_id, time.time())
+            (uid, req.first_name, req.referrer_id, time.time())
         )
         conn.commit()
-        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+        c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
 
-    if req.user_id == str(ADMIN_ID) and not user['has_paid']:
-        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
+    if uid == str(ADMIN_ID) and not user['has_paid']:
+        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (uid,))
         conn.commit()
-        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+        c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
 
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
+    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (uid,))
     invited_count = c.fetchone()['count']
 
     if invited_count >= 20:
@@ -151,7 +196,7 @@ async def sync_user(req: UserSyncRequest):
         new_balance = user['balance']
 
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?",
-              (new_balance, time.time(), req.user_id))
+              (new_balance, time.time(), uid))
     conn.commit()
     conn.close()
 
@@ -167,9 +212,10 @@ async def sync_user(req: UserSyncRequest):
 # --- API: تأیید پرداخت ---
 @app.post("/confirm-payment")
 async def confirm_payment(req: ConfirmPaymentRequest):
+    uid = resolve_user_id(req)
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+    c.execute("SELECT * FROM users WHERE id=?", (uid,))
     user = c.fetchone()
 
     if not user:
@@ -181,7 +227,7 @@ async def confirm_payment(req: ConfirmPaymentRequest):
         return {"ok": False, "message": "Already paid"}
 
     c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?",
-              (time.time(), req.user_id))
+              (time.time(), uid))
 
     if user['referrer_id']:
         c.execute(
@@ -196,9 +242,10 @@ async def confirm_payment(req: ConfirmPaymentRequest):
 # --- API: برداشت ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
+    uid = resolve_user_id(req)
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT balance FROM users WHERE id=?", (req.user_id,))
+    c.execute("SELECT balance FROM users WHERE id=?", (uid,))
     user = c.fetchone()
 
     if not user or user['balance'] < req.amount:
@@ -207,22 +254,22 @@ async def request_withdraw(req: WithdrawRequest):
 
     c.execute(
         "INSERT INTO withdrawals (user_id, amount, address, status) VALUES (?, ?, ?, 'pending')",
-        (req.user_id, req.amount, req.address)
+        (uid, req.amount, req.address)
     )
-    c.execute("UPDATE users SET balance = balance - ? WHERE id=?", (req.amount, req.user_id))
+    c.execute("UPDATE users SET balance = balance - ? WHERE id=?", (req.amount, uid))
     wd_id = c.lastrowid
     conn.commit()
     conn.close()
 
     bot = Bot(token=BOT_TOKEN)
     text = (f"🔴 **New Withdrawal Request**\n\n"
-            f"👤 User: {req.username} (`{req.user_id}`)\n"
+            f"👤 User: {req.username} (`{uid}`)\n"
             f"💰 Amount: {req.amount} ZYR\n"
             f"📫 Address: `{req.address}`")
 
     keyboard = [[
-        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{wd_id}_{req.user_id}_{req.amount}"),
-        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{wd_id}_{req.user_id}_{req.amount}")
+        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{wd_id}_{uid}_{req.amount}"),
+        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{wd_id}_{uid}_{req.amount}")
     ]]
 
     try:
