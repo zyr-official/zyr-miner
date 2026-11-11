@@ -318,7 +318,7 @@
     }
 
     async function syncUser() {
-      if (isClaiming) return; // جلوگیری از تداخل موقع کلایم کردن
+      if (isClaiming) return;
       try {
         const res = await fetch(BACKEND + '/sync-user', {
             method: 'POST',
