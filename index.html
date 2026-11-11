@@ -1,564 +1,687 @@
-import os
-import json
-import time
-import base64
-import sqlite3
-import hashlib
-import hmac
-import math
-from contextlib import asynccontextmanager, contextmanager
-from urllib.parse import parse_qsl
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <title>ZYR Miner</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; font-family: 'Space Grotesk', sans-serif; }
+    :root { --bg: #050505; --surface: rgba(255, 255, 255, 0.03); --surface-hover: rgba(255, 255, 255, 0.08); --primary: #00d4ff; --primary-glow: rgba(0, 212, 255, 0.4); --secondary: #7b2fff; --text: #ffffff; --muted: #888888; --border: rgba(255, 255, 255, 0.08); --orange: #ff9800; --green: #4caf50; }
+    body { background-color: var(--bg); background-image: radial-gradient(circle at 15% 15%, rgba(123, 47, 255, 0.15) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(0, 212, 255, 0.1) 0%, transparent 40%); background-attachment: fixed; color: var(--text); min-height: 100vh; padding-bottom: 110px; overflow-x: hidden; }
+    .screen { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .screen.active { display: block; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .onboarding { padding: 40px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; }
+    .onboarding .icon-box { width: 90px; height: 90px; border-radius: 30px; background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,47,255,0.2)); border: 1px solid rgba(0,212,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 24px; box-shadow: 0 0 40px rgba(0,212,255,0.15); }
+    .onboarding h1 { font-size: 28px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.5px; }
+    .onboarding p { color: var(--muted); font-size: 15px; margin-bottom: 32px; line-height: 1.6; max-width: 300px; }
+    .btn { width: 100%; max-width: 340px; padding: 18px; border: none; border-radius: 100px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+    .btn-primary { background: var(--primary); color: #000; box-shadow: 0 8px 30px var(--primary-glow); }
+    .btn-primary:active { transform: scale(0.96); }
+    .btn-primary:disabled { opacity: 0.3; box-shadow: none; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 12px; }
+    .status { font-size: 13px; margin-top: 20px; min-height: 20px; font-weight: 500; }
+    .status.ok { color: var(--primary); }
+    .status.err { color: #ff4757; }
+    .app { padding: 24px 20px; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .profile { display: flex; align-items: center; gap: 12px; }
+    .profile-img { width: 48px; height: 48px; border-radius: 50%; background: var(--surface); border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 15px var(--primary-glow); }
+    .profile-img img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-name h2 { font-size: 17px; font-weight: 700; }
+    .profile-name p { font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.5px; }
+    
+    #ton-connect-container { display: flex; justify-content: center; width: 100%; margin-bottom: 20px; }
+    #ton-connect-button { width: 100%; display: flex; justify-content: center; }
+    #ton-connect-button > div { width: 100% !important; max-width: 100% !important; }
 
-import httpx
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, WebAppInfo
-from telegram.constants import ChatMemberStatus
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
+    .balance-section { background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 36px; padding: 30px 24px; text-align: center; position: relative; overflow: hidden; margin-bottom: 20px; backdrop-filter: blur(30px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+    .balance-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-weight: 600; }
+    .balance-amount { font-size: 36px; font-weight: 700; letter-spacing: -1px; display: flex; justify-content: center; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .balance-amount .unit { font-size: 20px; color: var(--primary); font-weight: 700; margin-left: 4px; }
+    .balance-ton { font-size: 14px; color: var(--muted); margin-top: 8px; }
 
-# ====== تنظیمات ======
-BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
+    .mining-engine { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); }
+    .engine-info { display: flex; flex-direction: column; gap: 6px; }
+    .engine-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
+    .engine-status .pulse { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: blink 0.8s infinite; }
+    .engine-rate { font-size: 22px; font-weight: 700; color: var(--text); }
+    .engine-rate span { font-size: 13px; color: var(--muted); font-weight: 500; }
+    
+    .live-mining-box { background: rgba(0, 212, 255, 0.05); border: 1px dashed rgba(0, 212, 255, 0.3); border-radius: 20px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .live-mining-title { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+    .live-mining-amount { font-size: 22px; font-weight: 700; color: var(--primary); display: flex; gap: 6px; align-items: baseline; }
 
-ADMIN_ID = 1839907139
-WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
-CHANNEL_ID = "@ZYRMining"
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "zyr_secret_change_me")
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 8px; backdrop-filter: blur(10px); }
+    .stat-header { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .stat-value { font-size: 18px; font-weight: 700; }
+    
+    .claim-action { width: 100%; padding: 20px; border: none; border-radius: 24px; background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); border: 1px solid rgba(0,212,255,0.4); color: var(--primary); font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.1); }
+    .claim-action:active { transform: scale(0.97); }
 
-# دیتابیس باید روی دیسک پایدار باشد؛ /tmp پاک می‌شود و باعث "User not found" و ریست ماینینگ می‌شد
-DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "zyr.db"))
+    .friends-header { margin-bottom: 16px; }
+    .friends-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+    .friends-header p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .action-row { display: flex; gap: 12px; margin-bottom: 16px; }
+    .action-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 100px; padding: 14px; color: var(--text); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+    .ref-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-bottom: 16px; }
+    .ref-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+    .ref-code-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .ref-code { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+    .ref-badge { background: rgba(0,212,255,0.1); color: var(--primary); border: 1px solid rgba(0,212,255,0.3); padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
+    .ref-link { background: rgba(0,0,0,0.4); padding: 12px; border-radius: 12px; font-size: 12px; color: var(--primary); word-break: break-all; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); }
+    
+    .friends-list-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
+    .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .friend-item:last-child { border-bottom: none; }
+    .friend-info { display: flex; flex-direction: column; gap: 2px; }
+    .friend-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .friend-status { font-size: 11px; font-weight: 600; }
+    .status-pending { color: var(--orange); }
+    .status-active { color: var(--green); }
+    .friend-claim-btn { background: var(--green); color: #fff; border: none; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
 
-TON_RECEIVER = os.getenv("TON_RECEIVER", "UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24")
-PAY_NANO = 100_000_000  # 0.1 TON
-TONCENTER_API_KEY = os.getenv("TONCENTER_API_KEY", "")
-# فقط برای تست بیرون از تلگرام: ALLOW_UNVERIFIED=1
-ALLOW_UNVERIFIED = os.getenv("ALLOW_UNVERIFIED", "0") == "1"
-MIN_WITHDRAW = 10000
-# =====================
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; }
+    .stat-box-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .stat-box-value { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .stat-box-sub { font-size: 11px; color: var(--primary); font-weight: 600; }
 
+    .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 16px; color: #fff; font-family: monospace; font-size: 14px; margin-bottom: 12px; outline: none; }
+    .input-field:focus { border-color: var(--primary); }
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=15, isolation_level=None)
-    conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-    except Exception:
-        pass
-    return conn
+    .percent-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .pct-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 0; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; text-align: center; }
+    .pct-btn:active { background: rgba(0, 212, 255, 0.15); transform: scale(0.95); }
 
+    .bottom-nav { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 100px; display: flex; justify-content: space-around; align-items: center; padding: 12px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+    .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; width: 60px; }
+    .nav-btn.active { color: var(--primary); }
+    .nav-btn svg { width: 22px; height: 22px; fill: currentColor; }
+    .nav-main { width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; display: flex; align-items: center; justify-content: center; transform: translateY(-20px); box-shadow: 0 10px 25px var(--primary-glow); border: 4px solid var(--bg); cursor: pointer; }
+    .nav-main svg { width: 26px; height: 26px; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  </style>
+</head>
+<body>
 
-@contextmanager
-def db_tx():
-    """تراکنش اتمیک؛ در صورت خطا rollback می‌شود."""
-    conn = get_db()
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-        yield conn.cursor()
-        conn.execute("COMMIT")
-    except Exception:
-        try:
-            conn.execute("ROLLBACK")
-        except Exception:
-            pass
-        raise
-    finally:
-        conn.close()
+  <div class="screen active" id="screen-join">
+    <div class="onboarding">
+      <div class="icon-box">⚡</div>
+      <h1>Join ZYR Network</h1>
+      <p>Become part of the ecosystem. Join our official channel to activate your mining engine.</p>
+      <button class="btn btn-primary" onclick="window.Telegram.WebApp.openTelegramLink('https://t.me/ZYRMining')">Join Channel</button>
+      <button class="btn btn-outline" id="btn-next-1" onclick="checkMembership()">Next Step →</button>
+      <div class="status" id="status-join"></div>
+    </div>
+  </div>
 
+  <div class="screen" id="screen-pay">
+    <div class="onboarding">
+      <div class="icon-box" style="background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,212,255,0.05)); border-color: rgba(0,212,255,0.4); color: var(--primary);">💎</div>
+      <h1>Activate Node</h1>
+      <p>Deposit a one-time fee of 0.1 TON to deploy your cloud miner. Yield starts instantly.</p>
+      <div style="font-size: 48px; font-weight: 700; color: var(--primary); margin-bottom: 24px;">0.1 <span style="font-size: 20px; color: var(--muted);">TON</span></div>
+      <div id="ton-connect-pay-page" style="width: 100%; display: flex; justify-content: center; margin-bottom: 20px;"></div>
+      <button class="btn btn-primary" id="btn-pay" onclick="payTON()" disabled>Deploy Miner</button>
+      <div class="status" id="status-pay"></div>
+    </div>
+  </div>
 
-def init_db():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        first_name TEXT,
-        balance REAL DEFAULT 0,
-        referrer_id TEXT,
-        referral_earned REAL DEFAULT 0,
-        has_paid INTEGER DEFAULT 0,
-        last_mining REAL DEFAULT 0
-    )''')
+  <div class="screen" id="screen-dashboard">
+    <div class="app">
+      <div class="top-bar">
+        <div class="profile">
+          <div class="profile-img" id="user-avatar"><svg viewBox="0 0 24 24" fill="var(--muted)" width="24" height="24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+          <div class="profile-name"><h2 id="user-name">ZYR User</h2><p id="user-level">Level 1</p></div>
+        </div>
+      </div>
 
-    c.execute('''CREATE TABLE IF NOT EXISTS referrals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        referrer_id TEXT,
-        friend_id TEXT,
-        reward_claimed INTEGER DEFAULT 0
-    )''')
+      <div id="ton-connect-container">
+        <div id="ton-connect-button"></div>
+      </div>
 
-    c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT, amount REAL, address TEXT, status TEXT
-    )''')
+      <div class="balance-section">
+        <div class="balance-title">Total Mined</div>
+        <div class="balance-amount"><span id="main-balance">0.00000</span> <span class="unit">ZYR</span></div>
+        <div class="balance-ton" id="ton-value">≈ 0.0000 TON</div>
+      </div>
 
-    # جلوگیری از استفاده‌ی چندباره از یک تراکنش پرداخت
-    c.execute('''CREATE TABLE IF NOT EXISTS used_payments (
-        tx_key TEXT PRIMARY KEY,
-        user_id TEXT,
-        created REAL
-    )''')
-    conn.close()
+      <div class="live-mining-box">
+        <div>
+          <div class="live-mining-title">Unclaimed Mined</div>
+          <div class="live-mining-amount">+<span id="pending-display">0.00000</span> <span style="font-size: 14px; font-weight:700;">ZYR</span></div>
+        </div>
+        <div class="engine-status"><div class="pulse"></div> Live</div>
+      </div>
 
+      <div class="mining-engine">
+        <div class="engine-info">
+          <div class="engine-status">Speed Rate</div>
+          <div class="engine-rate">+<span id="rate-display">80</span> <span>ZYR / day</span></div>
+        </div>
+      </div>
 
-init_db()
+      <div class="stats">
+        <div class="stat-card"><div class="stat-header">Per Hour</div><div class="stat-value"><span id="hour-display">3.33</span> ZYR</div></div>
+        <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
+      </div>
 
+      <button class="claim-action" id="btn-claim" onclick="claimTokens()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR
+      </button>
+    </div>
+  </div>
 
-class UserSyncRequest(BaseModel):
-    user_id: str | None = None
-    first_name: str = "ZYR User"
-    referrer_id: str | None = None
-    init_data: str | None = None
+  <div class="screen" id="screen-friends">
+    <div class="app">
+      <div class="friends-header" style="margin-top: 10px;">
+        <h1>Friends</h1>
+        <p>Invite friends and earn 300 ZYR when they pay 0.1 TON!</p>
+      </div>
+      
+      <div class="info-box">
+        <strong>Boost Levels:</strong><br>
+        • Level 1 (0 invited): 80 ZYR/day<br>
+        • Level 2 (3 invited): 110 ZYR/day<br>
+        • Level 3 (6 invited): 130 ZYR/day<br>
+        • Level 4 (10 invited): 150 ZYR/day<br><br>
+        <span style="color: var(--primary);">💡 Note: When your referral pays 0.1 TON, you get 300 ZYR!</span>
+      </div>
 
+      <div class="action-row">
+        <button class="action-btn" onclick="copyRefLink()">Copy Link</button>
+        <button class="action-btn" onclick="shareRefLink()">Share</button>
+      </div>
 
-class ClaimMiningRequest(BaseModel):
-    user_id: str | None = None
-    amount: float | None = None
-    init_data: str | None = None
+      <div class="ref-box">
+        <div class="ref-label">Your referral code</div>
+        <div class="ref-code-row"><div class="ref-code" id="ref-code">LOADING...</div><div class="ref-badge">300 ZYR</div></div>
+        <div class="ref-link" id="ref-link">https://t.me/...</div>
+      </div>
 
+      <div class="ref-label">Your Invited Friends</div>
+      <div class="friends-list-box" id="friends-list-container">
+        <div style="text-align: center; color: var(--muted); font-size: 12px; padding: 10px;">No friends invited yet.</div>
+      </div>
 
-class WithdrawRequest(BaseModel):
-    user_id: str | None = None
-    username: str = "ZYR User"
-    amount: float
-    address: str
-    init_data: str | None = None
+      <div class="stats-grid" style="margin-top: 16px;">
+        <div class="stat-box"><div class="stat-box-label">Invited</div><div class="stat-box-value" id="invited-count">0</div><div class="stat-box-sub" id="active-count">0 active</div></div>
+        <div class="stat-box"><div class="stat-box-label">Earned</div><div class="stat-box-value" style="color: var(--primary);" id="earned-referral">+0.00</div><div class="stat-box-sub">ZYR earned</div></div>
+      </div>
+    </div>
+  </div>
 
+  <div class="screen" id="screen-withdraw">
+    <div class="app">
+      <div class="friends-header" style="margin-top: 10px;"><h1>Withdraw ZYR</h1><p>Convert your mined ZYR tokens to TON.</p></div>
+      <div class="balance-section" style="padding: 20px; margin-bottom: 20px;">
+        <div class="balance-title">Available to Withdraw</div>
+        <div class="balance-amount" style="font-size: 32px;"><span id="wd-balance">0.0000</span> <span class="unit">ZYR</span></div>
+      </div>
+      <div class="ref-box">
+        <div class="ref-label">TON Wallet Address</div>
+        <input type="text" id="wd-address" class="input-field" placeholder="UQ...">
+        
+        <div class="ref-label">Amount (ZYR)</div>
+        <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
+        
+        <div class="percent-buttons">
+          <button class="pct-btn" onclick="setWithdrawPercent(0.25)">25%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.50)">50%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(0.80)">80%</button>
+          <button class="pct-btn" onclick="setWithdrawPercent(1.00)">MAX</button>
+        </div>
 
-class MemberCheckRequest(BaseModel):
-    user_id: str | None = None
-    init_data: str | None = None
+        <button class="btn btn-primary" onclick="requestWithdraw()" style="max-width: 100%;">Request Withdrawal</button>
+        <div class="status" id="status-wd" style="text-align: center;"></div>
+      </div>
+    </div>
+  </div>
 
+  <div class="screen" id="screen-pending">
+    <div class="onboarding">
+      <div class="icon-box" style="background: rgba(255, 193, 7, 0.1); border-color: rgba(255, 193, 7, 0.3); color: #ffc107;">⏳</div>
+      <h1>Withdrawal Pending</h1>
+      <p>Your request has been submitted successfully within 24 hours.</p>
+      <div style="font-size: 24px; font-weight: 700; color: #fff; margin: 20px 0;"><span id="pending-amount-display">0</span> ZYR</div>
+      <button class="btn btn-outline" onclick="switchTab('mining')">Back to Dashboard</button>
+    </div>
+  </div>
 
-class ConfirmPaymentRequest(BaseModel):
-    user_id: str | None = None
-    tx_hash: str | None = None
-    wallet_address: str | None = None
-    init_data: str | None = None
+  <div class="bottom-nav" id="main-nav" style="display: none;">
+    <div class="nav-btn active" id="nav-mining" onclick="switchTab('mining')">
+      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Mining
+    </div>
+    <div class="nav-btn" id="nav-friends" onclick="switchTab('friends')">
+      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> Friends
+    </div>
+    <div class="nav-main" onclick="switchTab('mining')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    </div>
+    <div class="nav-btn" id="nav-withdraw" onclick="switchTab('withdraw')">
+      <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg> Withdraw
+    </div>
+  </div>
 
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505');
 
-class ClaimRefRequest(BaseModel):
-    user_id: str | None = None
-    friend_id: str
-    init_data: str | None = None
+    const BACKEND = 'https://nann.pingooshop.ir';
+    const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
 
+    let tonConnectUI, syncInterval, animateInterval;
+    let serverBalance = 0;
+    let pendingMined = 0;
+    let currentRatePerDay = 80;
+    let tokensPerSecond = currentRatePerDay / 86400;
+    let isClaiming = false;
 
-def verify_init_data(init_data: str) -> str | None:
-    if not init_data:
-        return None
-    try:
-        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
-        received_hash = parsed.pop("hash", None)
-        if not received_hash:
-            return None
-        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-        computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(computed, received_hash):
-            return None
-        user = json.loads(parsed.get("user", "{}"))
-        uid = user.get("id")
-        return str(uid) if uid else None
-    except Exception as e:
-        print(f"[verify_init_data] {e}")
-        return None
-
-
-def resolve_user_id(req) -> str:
-    init_data = getattr(req, 'init_data', None)
-    if init_data:
-        verified = verify_init_data(init_data)
-        if verified:
-            return verified
-        if not ALLOW_UNVERIFIED:
-            raise HTTPException(status_code=401, detail="Invalid Telegram session, reopen the app")
-    if ALLOW_UNVERIFIED and getattr(req, 'user_id', None):
-        return str(req.user_id)
-    raise HTTPException(status_code=401, detail="Please open the app from Telegram")
-
-
-def get_rate(c, uid: str):
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (uid,))
-    invited_count = c.fetchone()['count']
-    if invited_count >= 10:
-        return 150, 4, invited_count
-    if invited_count >= 6:
-        return 130, 3, invited_count
-    if invited_count >= 3:
-        return 110, 2, invited_count
-    return 80, 1, invited_count
-
-
-telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await telegram_app.initialize()
-    await telegram_app.start()
-    yield
-    await telegram_app.stop()
-    await telegram_app.shutdown()
-
-
-app = FastAPI(lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.post("/check-member")
-async def check_member(req: MemberCheckRequest):
-    uid = resolve_user_id(req)
-    bot = Bot(token=BOT_TOKEN)
-    try:
-        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(uid))
-        if member.status in (
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.OWNER,
-        ):
-            return {"isMember": True}
-        return {"isMember": False}
-    except Exception as e:
-        return {"isMember": False, "error": str(e)}
-
-
-@app.post("/sync-user")
-async def sync_user(req: UserSyncRequest):
-    uid = resolve_user_id(req)
-    current_time = time.time()
-    first_name = (req.first_name or "ZYR User")[:64]
-
-    with db_tx() as c:
-        c.execute("SELECT * FROM users WHERE id=?", (uid,))
-        user = c.fetchone()
-
-        if not user:
-            c.execute(
-                "INSERT INTO users (id, first_name, last_mining) VALUES (?, ?, ?)",
-                (uid, first_name, current_time)
-            )
-            if req.referrer_id:
-                code = str(req.referrer_id).strip()
-                c.execute("SELECT id FROM users WHERE substr(id, -6) = ? AND id != ? LIMIT 1", (code, uid))
-                ref_user = c.fetchone()
-                if ref_user:
-                    c.execute("INSERT INTO referrals (referrer_id, friend_id, reward_claimed) VALUES (?, ?, 0)", (ref_user['id'], uid))
-                    c.execute("UPDATE users SET referrer_id=? WHERE id=?", (ref_user['id'], uid))
-            c.execute("SELECT * FROM users WHERE id=?", (uid,))
-            user = c.fetchone()
-        elif first_name and user['first_name'] != first_name:
-            c.execute("UPDATE users SET first_name=? WHERE id=?", (first_name, uid))
-
-        if uid == str(ADMIN_ID) and not user['has_paid']:
-            c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (current_time, uid))
-            c.execute("SELECT * FROM users WHERE id=?", (uid,))
-            user = c.fetchone()
-
-        rate_per_day, level, invited_count = get_rate(c, uid)
-
-        c.execute("SELECT COUNT(*) as count FROM users u JOIN referrals r ON u.id = r.friend_id WHERE r.referrer_id=? AND u.has_paid=1", (uid,))
-        active_invited_count = c.fetchone()['count']
-
-        tokens_per_second = rate_per_day / 86400
-        last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
-        time_diff = max(0, current_time - last_mining)
-        pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
-
-        c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
-        friends_list = [{
-            "id": row['id'],
-            "name": row['first_name'],
-            "has_paid": bool(row['has_paid']),
-            "reward_claimed": bool(row['reward_claimed'])
-        } for row in c.fetchall()]
-
-        result = {
-            "balance": round(user['balance'], 5),
-            "pending_mined": round(pending_mined, 5),
-            "has_paid": bool(user['has_paid']),
-            "invited": invited_count,
-            "active_invited": active_invited_count,
-            "referral_earned": round(user['referral_earned'], 2),
-            "rate_per_day": rate_per_day,
-            "level": level,
-            "friends": friends_list
+    const tgUser = tg.initDataUnsafe?.user || {};
+    let userId = tgUser.id ? tgUser.id.toString() : null;
+    if (!userId) {
+        let storedId = localStorage.getItem('zyr_test_user_id');
+        if (!storedId) {
+            storedId = Math.floor(100000000 + Math.random() * 900000000).toString();
+            localStorage.setItem('zyr_test_user_id', storedId);
         }
-    return result
+        userId = storedId;
+        if (!tgUser.first_name) tgUser.first_name = "Test Miner";
+    }
 
+    const initData = tg.initData || '';
+    const myRefCode = userId.slice(-6).toUpperCase();
+    const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
 
-@app.post("/claim-mining")
-async def claim_mining(req: ClaimMiningRequest):
-    uid = resolve_user_id(req)
-    try:
-        with db_tx() as c:
-            c.execute("SELECT balance, last_mining, has_paid FROM users WHERE id=?", (uid,))
-            user = c.fetchone()
-            current_time = time.time()
+    let referrerId = null;
+    const startParam = tg.initDataUnsafe?.start_param || "";
+    if (startParam.startsWith('ref_')) {
+        referrerId = startParam.replace('ref_', '');
+    }
 
-            if not user:
-                raise HTTPException(status_code=404, detail="User not found")
-            if not user['has_paid']:
-                raise HTTPException(status_code=400, detail="Miner not activated")
+    function initTonConnect() {
+      if (tonConnectUI) return;
+      tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: BACKEND + '/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect-button'
+      });
+      tonConnectUI.onStatusChange(wallet => {
+        const btnPay = document.getElementById('btn-pay');
+        if (btnPay) btnPay.disabled = !wallet;
+      });
+    }
 
-            rate_per_day, _, _ = get_rate(c, uid)
-            tokens_per_sec = rate_per_day / 86400
-            last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
-            time_diff = max(0, current_time - last_mining)
-            server_pending = time_diff * tokens_per_sec
+    async function syncUser() {
+      if (isClaiming) return;
+      try {
+        const res = await fetch(BACKEND + '/sync-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: userId,
+                first_name: tgUser.first_name || "ZYR User",
+                referrer_id: referrerId,
+                init_data: initData
+            })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
 
-            new_balance = user['balance'] + server_pending
-            c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
-        return {"ok": True, "new_balance": round(new_balance, 5), "claimed": round(server_pending, 5)}
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[CLAIM ERROR] {e}")
-        raise HTTPException(status_code=500, detail="Server error, try again")
+        serverBalance = data.balance;
+        pendingMined = data.pending_mined || 0;
 
+        document.getElementById('invited-count').textContent = data.invited || 0;
+        document.getElementById('active-count').textContent = `${data.active_invited || 0} active`;
+        document.getElementById('earned-referral').textContent = `+${data.referral_earned || 0}`;
 
-# ---------- تایید واقعی پرداخت روی بلاکچین ----------
-def addr_hash(addr: str) -> str | None:
-    """هش ۳۲ بایتی آدرس را از فرمت raw یا user-friendly بیرون می‌کشد."""
-    try:
-        addr = addr.strip()
-        if ":" in addr:
-            return addr.split(":", 1)[1].lower()
-        a = addr.replace("+", "-").replace("/", "_")
-        raw = base64.urlsafe_b64decode(a + "=" * (-len(a) % 4))
-        if len(raw) == 36:
-            return raw[2:34].hex()
-    except Exception:
-        pass
-    return None
+        renderFriendsList(data.friends || []);
 
+        if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
+            currentRatePerDay = data.rate_per_day;
+            tokensPerSecond = currentRatePerDay / 86400;
+            document.getElementById('rate-display').textContent = currentRatePerDay;
+            document.getElementById('hour-display').textContent = (currentRatePerDay / 24).toFixed(2);
+        }
 
-async def find_payments(sender_addr: str) -> list[str]:
-    want = addr_hash(sender_addr)
-    if not want:
-        return []
-    headers = {"X-API-Key": TONCENTER_API_KEY} if TONCENTER_API_KEY else {}
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.get(
-                "https://toncenter.com/api/v2/getTransactions",
-                params={"address": TON_RECEIVER, "limit": 40},
-                headers=headers,
-            )
-        data = r.json()
-    except Exception as e:
-        print(f"[PAYMENT] toncenter error: {e}")
-        return []
-    if not data.get("ok"):
-        return []
+        if (data.level) {
+            document.getElementById('user-level').textContent = `Level ${data.level}`;
+        }
 
-    now = time.time()
-    keys = []
-    for tx in data.get("result", []):
-        msg = tx.get("in_msg") or {}
-        src = msg.get("source")
-        if not src:
-            continue
-        try:
-            value = int(msg.get("value", "0"))
-        except Exception:
-            continue
-        if value < PAY_NANO:
-            continue
-        if addr_hash(src) != want:
-            continue
-        if now - tx.get("utime", 0) > 3600:
-            continue
-        tid = tx.get("transaction_id", {})
-        keys.append(f"{tid.get('lt')}:{tid.get('hash')}")
-    return keys
+        if (data.has_paid) {
+            startApp();
+        }
 
+        updateUI();
+        return data;
+      } catch (e) {
+        console.error('[sync-user] failed:', e);
+        return null;
+      }
+    }
 
-@app.post("/confirm-payment")
-async def confirm_payment(req: ConfirmPaymentRequest):
-    uid = resolve_user_id(req)
+    function renderFriendsList(friends) {
+        const container = document.getElementById('friends-list-container');
+        if (!friends || friends.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: var(--muted); font-size: 12px; padding: 10px;">No friends invited yet.</div>`;
+            return;
+        }
 
-    conn = get_db()
-    row = conn.execute("SELECT has_paid FROM users WHERE id=?", (uid,)).fetchone()
-    conn.close()
-    if row and row['has_paid']:
-        return {"ok": True, "message": "Already active"}
+        let html = '';
+        friends.forEach(f => {
+            const hasPaid = f.has_paid;
+            const claimed = f.reward_claimed;
+            const statusClass = hasPaid ? 'status-active' : 'status-pending';
+            const statusText = hasPaid ? 'Active (0.1 TON Paid)' : 'Pending (No TON)';
+            
+            let actionBtn = '';
+            if (hasPaid && !claimed) {
+                actionBtn = `<button class="friend-claim-btn" onclick="claimRefReward('${f.id}')">Claim 300 ZYR</button>`;
+            } else if (claimed) {
+                actionBtn = `<span style="font-size: 11px; color: var(--primary);">Claimed ✅</span>`;
+            } else {
+                actionBtn = `<span style="font-size: 11px; color: var(--muted);">Waiting TON</span>`;
+            }
 
-    if not req.wallet_address:
-        raise HTTPException(status_code=400, detail="wallet_address required")
+            html += `
+              <div class="friend-item">
+                <div class="friend-info">
+                  <span class="friend-name">${f.name || 'User'}</span>
+                  <span class="friend-status ${statusClass}">${statusText}</span>
+                </div>
+                <div>${actionBtn}</div>
+              </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
 
-    keys = await find_payments(req.wallet_address)
-    if not keys:
-        return {"ok": False, "pending": True, "message": "Payment not found yet"}
+    async function claimRefReward(friendId) {
+        try {
+            const res = await fetch(BACKEND + '/claim-ref-reward', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, friend_id: friendId, init_data: initData })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                syncUser();
+            } else {
+                alert(data.message || 'Error claiming reward');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
-    current_time = time.time()
-    with db_tx() as c:
-        for k in keys:
-            c.execute("SELECT 1 FROM used_payments WHERE tx_key=?", (k,))
-            if c.fetchone():
-                continue
-            c.execute("INSERT INTO used_payments (tx_key, user_id, created) VALUES (?, ?, ?)", (k, uid, current_time))
-            c.execute("SELECT id FROM users WHERE id=?", (uid,))
-            if c.fetchone():
-                c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (current_time, uid))
-            else:
-                c.execute("INSERT INTO users (id, has_paid, last_mining) VALUES (?, 1, ?)", (uid, current_time))
-            return {"ok": True, "message": "Payment confirmed"}
-    return {"ok": False, "pending": True, "message": "Payment already used"}
+    function startLiveAnimation() {
+        if (animateInterval) clearInterval(animateInterval);
+        animateInterval = setInterval(() => {
+            pendingMined += tokensPerSecond * 0.1;
+            updateUI();
+        }, 100);
+    }
 
+    function updateUI() {
+        document.getElementById('main-balance').textContent = serverBalance.toFixed(5);
+        document.getElementById('ton-value').textContent = `≈ ${(serverBalance * 0.0001).toFixed(4)} TON`;
+        document.getElementById('pending-display').textContent = pendingMined.toFixed(5);
+    }
 
-@app.post("/claim-ref-reward")
-async def claim_ref_reward(req: ClaimRefRequest):
-    uid = resolve_user_id(req)
-    with db_tx() as c:
-        c.execute("SELECT * FROM referrals WHERE referrer_id=? AND friend_id=? AND reward_claimed=0", (uid, req.friend_id))
-        ref = c.fetchone()
-        if not ref:
-            return {"ok": False, "message": "Reward not available"}
+    async function checkMembership() {
+      const st = document.getElementById('status-join');
+      const btn = document.getElementById('btn-next-1');
+      st.textContent = 'Checking membership...';
+      st.className = 'status';
+      btn.disabled = true;
 
-        c.execute("SELECT has_paid FROM users WHERE id=?", (req.friend_id,))
-        friend = c.fetchone()
-        if not friend or not friend['has_paid']:
-            return {"ok": False, "message": "Friend has not paid 0.1 TON yet"}
+      try {
+        const res = await fetch(BACKEND + '/check-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, init_data: initData })
+        });
+        const data = await res.json();
 
-        c.execute("UPDATE referrals SET reward_claimed = 1 WHERE id=? AND reward_claimed=0", (ref['id'],))
-        if c.rowcount == 0:
-            return {"ok": False, "message": "Reward not available"}
-        c.execute("UPDATE users SET balance = balance + 300, referral_earned = referral_earned + 300 WHERE id=?", (uid,))
-    return {"ok": True, "message": "300 ZYR claimed!"}
+        if (data.isMember) {
+            st.textContent = '✅ Verified! Proceeding...';
+            st.className = 'status ok';
+            const syncData = await syncUser();
+            setTimeout(() => {
+                if (syncData && syncData.has_paid) {
+                    startApp();
+                } else {
+                    showScreen('screen-pay');
+                    initTonConnect();
+                }
+            }, 800);
+        } else {
+            st.textContent = '❌ You must join the channel first.';
+            st.className = 'status err';
+            btn.disabled = false;
+        }
+      } catch (e) {
+        st.textContent = '❌ Network error.';
+        st.className = 'status err';
+        btn.disabled = false;
+      }
+    }
 
+    async function payTON() {
+      if (!tonConnectUI?.account) return;
+      const st = document.getElementById('status-pay');
+      const btn = document.getElementById('btn-pay');
+      st.textContent = 'Confirm in wallet...';
+      st.className = 'status';
+      btn.disabled = true;
 
-@app.post("/request-withdraw")
-async def request_withdraw(req: WithdrawRequest):
-    uid = resolve_user_id(req)
-    amount = req.amount
-    address = (req.address or "").strip()
+      try {
+        const tx = {
+            validUntil: Math.floor(Date.now() / 1000) + 600,
+            messages: [{ address: TON_RECEIVER, amount: '100000000' }]
+        };
+        await tonConnectUI.sendTransaction(tx);
 
-    if not math.isfinite(amount) or amount < MIN_WITHDRAW:
-        raise HTTPException(status_code=400, detail=f"Minimum is {MIN_WITHDRAW} ZYR")
-    if len(address) < 48:
-        raise HTTPException(status_code=400, detail="Invalid TON address")
+        st.textContent = '⏳ Verifying payment...';
+        st.className = 'status ok';
 
-    with db_tx() as c:
-        c.execute("UPDATE users SET balance = balance - ? WHERE id=? AND balance >= ?", (amount, uid, amount))
-        if c.rowcount == 0:
-            raise HTTPException(status_code=400, detail="Insufficient balance")
-        c.execute(
-            "INSERT INTO withdrawals (user_id, amount, address, status) VALUES (?, ?, ?, 'pending')",
-            (uid, amount, address)
-        )
-        wd_id = c.lastrowid
+        // تلاش برای تایید پرداخت با چند بار تکرار در صورت تاخیر شبکه
+        let paidConfirmed = false;
+        for (let i = 0; i < 3; i++) {
+            try {
+                const payRes = await fetch(BACKEND + '/confirm-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, init_data: initData })
+                });
+                if (payRes.ok) {
+                    paidConfirmed = true;
+                    break;
+                }
+            } catch (err) {
+                console.log('Retry confirm payment...', err);
+            }
+            await new Promise(r => setTimeout(r, 2000));
+        }
 
-    bot = Bot(token=BOT_TOKEN)
-    text = (f"🔴 New Withdrawal Request\n\n"
-            f"👤 User: {req.username} ({uid})\n"
-            f"💰 Amount: {amount} ZYR\n"
-            f"📫 Address: {address}")
+        const data = await syncUser();
+        if (data?.has_paid || paidConfirmed) {
+            startApp();
+        } else {
+            st.textContent = '⚠️ Payment recorded, please restart app.';
+            setTimeout(() => startApp(), 2000);
+        }
+      } catch (e) {
+        st.textContent = '❌ Cancelled or failed.';
+        st.className = 'status err';
+        btn.disabled = false;
+      }
+    }
 
-    keyboard = [[
-        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{wd_id}_{uid}_{amount}"),
-        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{wd_id}_{uid}_{amount}")
-    ]]
+    function startApp() {
+      showScreen('screen-dashboard');
+      document.getElementById('main-nav').style.display = 'flex';
+      document.getElementById('user-name').textContent = tgUser.first_name || "ZYR User";
+      if (tgUser.photo_url) {
+        const imgHtml = `<img src="${tgUser.photo_url}">`;
+        document.getElementById('user-avatar').innerHTML = imgHtml;
+      }
 
-    try:
-        await bot.send_message(chat_id=ADMIN_ID, text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-    except Exception as e:
-        print(f"[WITHDRAW] error: {e}")
+      document.getElementById('ref-code').textContent = myRefCode;
+      document.getElementById('ref-link').textContent = myRefLink;
 
-    return {"ok": True}
+      initTonConnect();
 
+      if (syncInterval) clearInterval(syncInterval);
+      syncInterval = setInterval(syncUser, 15000);
 
-@app.get("/tonconnect-manifest.json")
-async def get_manifest():
-    return JSONResponse({
-        "url": WEBAPP_URL,
-        "name": "ZYR Miner",
-        "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
-    })
+      startLiveAnimation();
+    }
 
+    async function claimTokens() {
+      if (pendingMined <= 0 || isClaiming) return;
+      
+      isClaiming = true;
+      const claimAmount = pendingMined;
+      const btn = document.getElementById('btn-claim');
+      btn.disabled = true;
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '⏳ Claiming...';
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.effective_user or not update.message:
-        return
-    user_name = update.effective_user.first_name or "Miner"
-    ref_id = None
-    if context.args and context.args[0].startswith("ref_"):
-        ref_id = context.args[0].replace("ref_", "")
+      try {
+          const res = await fetch(BACKEND + '/claim-mining', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: userId, amount: claimAmount, init_data: initData })
+          });
+          
+          const textResponse = await res.text();
+          let data;
+          try {
+              data = JSON.parse(textResponse);
+          } catch (err) {
+              throw new Error("پاسخ سرور نامعتبر است");
+          }
+          
+          if (res.ok && data.ok) {
+              pendingMined = 0;
+              serverBalance = data.new_balance;
+              updateUI();
 
-    url = WEBAPP_URL
-    if ref_id:
-        url += f"?startapp=ref_{ref_id}"
+              if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+              
+              btn.innerHTML = '✅ Claimed & Added!';
+              setTimeout(() => { 
+                  btn.innerHTML = originalHtml; 
+                  btn.disabled = false;
+                  isClaiming = false;
+              }, 2000);
+          } else {
+              throw new Error(data.detail || data.message || 'خطا در ثبت پاداش');
+          }
+      } catch (e) {
+          console.error(e);
+          alert('❌ خطا: ' + e.message);
+          btn.innerHTML = originalHtml;
+          btn.disabled = false;
+          isClaiming = false;
+      }
+    }
 
-    welcome_text = (
-        f"⚡ **Welcome to ZYR Cloud Miner, {user_name}!**\n\n"
-        f"⛏️ **Mine ZYR inside the app:** Start your session, claim tokens, and withdraw to TON.\n"
-        f"💎 **Activate your miner:** Deposit 0.1 TON to start earning 80 ZYR daily.\n"
-        f"👥 **Invite friends:** Boost your mining rate and earn 300 ZYR when they pay 0.1 TON.\n\n"
-        f"👇 **Tap below to start!**"
-    )
-    keyboard = [[InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]]
-    try:
-        await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-    except Exception:
-        # اگر اسم کاربر کاراکتر خاص مارک‌داون داشت
-        await update.message.reply_text(welcome_text.replace("*", ""), reply_markup=InlineKeyboardMarkup(keyboard))
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      window.scrollTo(0, 0);
+    }
 
+    function switchTab(tab) {
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      
+      if (tab === 'mining') {
+        showScreen('screen-dashboard');
+        document.getElementById('nav-mining').classList.add('active');
+      } else if (tab === 'friends') {
+        showScreen('screen-friends');
+        document.getElementById('nav-friends').classList.add('active');
+      } else if (tab === 'withdraw') {
+        showScreen('screen-withdraw');
+        document.getElementById('nav-withdraw').classList.add('active');
+        document.getElementById('wd-balance').textContent = serverBalance.toFixed(4);
+      }
+    }
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if not query or not query.from_user or query.from_user.id != ADMIN_ID:
-        if query:
-            await query.answer("Not allowed", show_alert=True)
-        return
-    await query.answer()
-    try:
-        parts = query.data.split("_", 3)
-        action, wd_id = parts[0], int(parts[1])
-    except Exception:
-        await query.edit_message_text("❌ Invalid callback data.")
-        return
+    function setWithdrawPercent(percentage) {
+      const calculatedAmount = Math.floor(serverBalance * percentage);
+      document.getElementById('wd-amount').value = calculatedAmount > 0 ? calculatedAmount : 0;
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    }
 
-    with db_tx() as c:
-        c.execute("SELECT * FROM withdrawals WHERE id=?", (wd_id,))
-        wd = c.fetchone()
-        if not wd or wd['status'] != 'pending':
-            text = "⚠️ This request was already processed."
-        elif action == "approve":
-            c.execute("UPDATE withdrawals SET status='approved' WHERE id=?", (wd_id,))
-            text = f"✅ Approved {wd['amount']} ZYR for user {wd['user_id']}.\n📫 {wd['address']}"
-        elif action == "reject":
-            c.execute("UPDATE users SET balance = balance + ? WHERE id=?", (wd['amount'], wd['user_id']))
-            c.execute("UPDATE withdrawals SET status='rejected' WHERE id=?", (wd_id,))
-            text = f"❌ Rejected {wd['amount']} ZYR. Funds returned."
-        else:
-            text = "❌ Unknown action."
-    await query.edit_message_text(text=text)
+    function copyRefLink() {
+      navigator.clipboard.writeText(myRefLink);
+      tg.showAlert('Copied!');
+    }
 
+    function shareRefLink() {
+      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn ZYR! 🚀\n\n${myRefLink}`;
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`);
+    }
 
-telegram_app.add_handler(CommandHandler("start", start_command))
-telegram_app.add_handler(CallbackQueryHandler(handle_callback))
+    async function requestWithdraw() {
+      const st = document.getElementById('status-wd');
+      const address = document.getElementById('wd-address').value.trim();
+      const amount = parseFloat(document.getElementById('wd-amount').value);
 
+      if (!address || address.length < 48) {
+        st.textContent = '❌ Enter a valid TON address.';
+        st.className = 'status err';
+        return;
+      }
+      if (!amount || amount < 10000) {
+        st.textContent = '❌ Minimum is 10,000 ZYR.';
+        st.className = 'status err';
+        return;
+      }
+      if (amount > serverBalance) {
+        st.textContent = '❌ Insufficient balance (Claim your mined tokens first).';
+        st.className = 'status err';
+        return;
+      }
 
-@app.post("/api/webhook")
-async def telegram_webhook(request: Request):
-    if WEBHOOK_SECRET:
-        token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-        if token != WEBHOOK_SECRET:
-            raise HTTPException(status_code=403, detail="Forbidden")
+      st.textContent = '⏳ Sending request...';
+      st.className = 'status ok';
 
-    try:
-        data = await request.json()
-        update = Update.de_json(data, telegram_app.bot)
-        await telegram_app.process_update(update)
-    except Exception as e:
-        print(f"[WEBHOOK] error: {e}")
-    return {"ok": True}
+      try {
+        const res = await fetch(BACKEND + '/request-withdraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: userId,
+                username: tgUser.first_name || "ZYR User",
+                amount: amount,
+                address: address,
+                init_data: initData
+            })
+        });
+        if (!res.ok) throw new Error('Server error');
 
+        await syncUser();
 
-@app.get("/")
-def read_root():
-    return {"status": "Backend is running"}
+        document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
+        showScreen('screen-pending');
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      } catch (e) {
+        st.textContent = '❌ ' + e.message;
+        st.className = 'status err';
+      }
+    }
+
+    syncUser();
+  </script>
+</body>
+</html>
