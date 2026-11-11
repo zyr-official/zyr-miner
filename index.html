@@ -526,30 +526,43 @@
       startLiveAnimation();
     }
 
-    // عملکرد دقیق کلایم: انتقال موجودی لحظه‌ای به موجودی اصلی و صفر کردن پایین
     async function claimTokens() {
       if (pendingMined <= 0) return;
       
       const claimAmount = pendingMined;
-      pendingMined = 0;
-      serverBalance += claimAmount;
-      updateUI();
-
-      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-      
       const btn = document.getElementById('btn-claim');
-      const original = btn.innerHTML;
-      btn.innerHTML = '✅ Claimed & Added!';
-      setTimeout(() => { btn.innerHTML = original; }, 2000);
+      btn.disabled = true;
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '⏳ Processing...';
 
       try {
-          await fetch(BACKEND + '/claim-mining', {
+          const res = await fetch(BACKEND + '/claim-mining', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ user_id: userId, amount: claimAmount, init_data: initData })
           });
+          const data = await res.json();
+          
+          if (res.ok && data.ok) {
+              pendingMined = 0;
+              serverBalance = data.new_balance;
+              updateUI();
+
+              if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+              
+              btn.innerHTML = '✅ Claimed & Added!';
+              setTimeout(() => { 
+                  btn.innerHTML = originalHtml; 
+                  btn.disabled = false;
+              }, 2000);
+          } else {
+              throw new Error(data.message || 'Failed to claim');
+          }
       } catch (e) {
           console.error(e);
+          alert('❌ Error claiming tokens. Please try again.');
+          btn.innerHTML = originalHtml;
+          btn.disabled = false;
       }
       syncUser();
     }
@@ -572,7 +585,6 @@
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
-        // فقط موجودی تایید شده (Server Balance) در بخش برداشت لحاظ می‌شود
         document.getElementById('wd-balance').textContent = serverBalance.toFixed(4);
       }
     }
