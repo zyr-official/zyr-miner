@@ -75,7 +75,6 @@
     .stat-box-sub { font-size: 12px; color: var(--primary); font-weight: 600; }
     .input-field { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 18px; color: #fff; font-family: monospace; font-size: 15px; margin-bottom: 20px; outline: none; transition: 0.3s; }
     .input-field:focus { border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
-    
     .bottom-nav { position: fixed; bottom: 24px; left: 24px; right: 24px; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 100px; display: flex; justify-content: space-around; align-items: center; padding: 14px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
     .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; width: 60px; }
     .nav-btn.active { color: var(--primary); }
@@ -231,9 +230,9 @@
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand(); tg.setHeaderColor('#050505'); tg.setBackgroundColor('#050505');
 
-    const BACKEND = 'https://nann.pingooshop.ir'; 
+    const BACKEND = 'https://nann.pingooshop.ir';
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
-    
+
     let tonConnectUI, syncInterval, animateInterval;
     let serverBalance = 0;
     let pendingMined = 0;
@@ -256,46 +255,48 @@
         const res = await fetch(BACKEND + '/sync-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                user_id: userId, 
+            body: JSON.stringify({
+                user_id: userId,
                 first_name: tgUser.first_name,
                 referrer_id: referrerId
             })
         });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
-        
+
         serverBalance = data.balance;
         document.getElementById('invited-count').textContent = data.invited;
         document.getElementById('earned-referral').textContent = `+${data.referral_earned}`;
-        
+
         if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
             currentRatePerDay = data.rate_per_day;
             tokensPerSecond = currentRatePerDay / 86400;
             document.getElementById('rate-display').textContent = currentRatePerDay;
             document.getElementById('hour-display').textContent = (currentRatePerDay / 24).toFixed(2);
         }
-        
+
         if (data.level) {
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
-        if (data.has_paid) {
-            if(!document.getElementById('screen-dashboard').classList.contains('active')) {
-                startApp();
-            }
+        if (data.has_paid && !document.getElementById('screen-dashboard').classList.contains('active')) {
+            startApp();
         }
-        
+
         updateUI();
         return data;
-      } catch(e) { console.error(e); return null; }
+      } catch (e) {
+        console.error('[sync-user] failed:', e);
+        return null;
+      }
     }
 
     function startLiveAnimation() {
         if (animateInterval) clearInterval(animateInterval);
         animateInterval = setInterval(() => {
-            pendingMined += tokensPerSecond * 0.2; 
+            pendingMined += tokensPerSecond * 0.2;
             updateUI();
-        }, 200); 
+        }, 200);
     }
 
     function updateUI() {
@@ -305,10 +306,10 @@
     }
 
     async function checkMembership() {
-      const st = document.getElementById('status-join'); 
+      const st = document.getElementById('status-join');
       const btn = document.getElementById('btn-next-1');
-      st.textContent = 'Checking membership...'; 
-      st.className = 'status'; 
+      st.textContent = 'Checking membership...';
+      st.className = 'status';
       btn.disabled = true;
 
       try {
@@ -317,14 +318,14 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId })
         });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
+        console.log('[check-member]', data);
 
         if (data.isMember) {
-            st.textContent = '✅ Verified! Proceeding...'; 
+            st.textContent = '✅ Verified! Proceeding...';
             st.className = 'status ok';
-            
             const syncData = await syncUser();
-            
             setTimeout(() => {
                 if (syncData && syncData.has_paid) {
                     startApp();
@@ -333,44 +334,70 @@
                     initTonConnect();
                 }
             }, 800);
-
         } else {
-            st.textContent = '❌ You must join the channel first.'; 
-            st.className = 'status err'; 
+            st.textContent = data.error
+                ? '❌ ' + data.error
+                : '❌ You must join the channel first.';
+            st.className = 'status err';
             btn.disabled = false;
         }
       } catch (e) {
-        st.textContent = '❌ Error checking membership.'; 
-        st.className = 'status err'; 
+        console.error('[check-member] failed:', e);
+        st.textContent = '❌ Network error: ' + e.message;
+        st.className = 'status err';
         btn.disabled = false;
       }
     }
 
     function initTonConnect() {
       if (tonConnectUI) return;
-      tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl: BACKEND + '/tonconnect-manifest.json', buttonRootId: 'ton-connect-button' });
-      tonConnectUI.onStatusChange(wallet => { document.getElementById('btn-pay').disabled = !wallet; });
+      tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: BACKEND + '/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect-button'
+      });
+      tonConnectUI.onStatusChange(wallet => {
+        document.getElementById('btn-pay').disabled = !wallet;
+      });
     }
 
     async function payTON() {
       if (!tonConnectUI?.account) return;
-      const st = document.getElementById('status-pay'); const btn = document.getElementById('btn-pay');
-      st.textContent = 'Confirm in wallet...'; st.className = 'status'; btn.disabled = true;
+      const st = document.getElementById('status-pay');
+      const btn = document.getElementById('btn-pay');
+      st.textContent = 'Confirm in wallet...';
+      st.className = 'status';
+      btn.disabled = true;
+
       try {
-        const tx = { validUntil: Math.floor(Date.now() / 1000) + 600, messages: [{ address: TON_RECEIVER, amount: '100000000' }] };
+        const tx = {
+            validUntil: Math.floor(Date.now() / 1000) + 600,
+            messages: [{ address: TON_RECEIVER, amount: '100000000' }]
+        };
         await tonConnectUI.sendTransaction(tx);
-        
-        st.textContent = '⏳ Verifying payment...'; st.className = 'status ok';
-        
+
+        st.textContent = '⏳ Verifying payment...';
+        st.className = 'status ok';
+
         await fetch(BACKEND + '/confirm-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId })
         });
 
-        await new Promise(r => setTimeout(r, 1000)); 
-        syncUser();
-      } catch (e) { st.textContent = '❌ Cancelled.'; st.className = 'status err'; btn.disabled = false; }
+        const data = await syncUser();
+        if (data?.has_paid) {
+            startApp();
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        } else {
+            st.textContent = '⚠️ Payment recorded, sync delayed. Reload app.';
+            st.className = 'status err';
+        }
+      } catch (e) {
+        console.error('[pay]', e);
+        st.textContent = '❌ Cancelled or failed.';
+        st.className = 'status err';
+        btn.disabled = false;
+      }
     }
 
     function startApp() {
@@ -382,94 +409,123 @@
         const imgHtml = `<img src="${tgUser.photo_url}">`;
         document.getElementById('user-avatar').innerHTML = imgHtml;
         document.getElementById('user-avatar-friends').innerHTML = imgHtml;
+        document.getElementById('user-avatar-wd').innerHTML = imgHtml;
       }
-      
+
       document.getElementById('ref-code').textContent = myRefCode;
       document.getElementById('ref-link').textContent = myRefLink;
-      
+
       if (syncInterval) clearInterval(syncInterval);
       syncInterval = setInterval(syncUser, 10000);
-      
+
       startLiveAnimation();
     }
 
-    // ✅ منطق اصلاح شده: صفر شدن قطعی
     async function claimTokens() {
       if (pendingMined <= 0) return;
-      
       const st = document.getElementById('btn-claim');
+      const original = st.innerHTML;
       st.innerHTML = 'Syncing...';
-      
-      // ۱. صفر کردن شمارنده فعلی
       pendingMined = 0;
-      updateUI(); 
-      
-      // ۲. گرفتن موجودی جدید از سرور
+      updateUI();
+
       const data = await syncUser();
-      
       if (data) {
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         st.innerHTML = '✅ Claimed!';
-        setTimeout(() => {
-            st.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR';
-        }, 2000);
+        setTimeout(() => { st.innerHTML = original; }, 2000);
       } else {
-        st.innerHTML = 'Error';
+        st.innerHTML = '❌ Error, try again';
+        setTimeout(() => { st.innerHTML = original; }, 2000);
       }
     }
 
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active'); window.scrollTo(0, 0);
+      document.getElementById(id).classList.add('active');
+      window.scrollTo(0, 0);
     }
 
     function switchTab(tab) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-      if (tab === 'mining') { showScreen('screen-dashboard'); document.getElementById('nav-mining').classList.add('active'); }
-      else if (tab === 'friends') { showScreen('screen-friends'); document.getElementById('nav-friends').classList.add('active'); }
-      else if (tab === 'withdraw') {
-        showScreen('screen-withdraw'); document.getElementById('nav-withdraw').classList.add('active');
+      if (tab === 'mining') {
+        showScreen('screen-dashboard');
+        document.getElementById('nav-mining').classList.add('active');
+      } else if (tab === 'friends') {
+        showScreen('screen-friends');
+        document.getElementById('nav-friends').classList.add('active');
+      } else if (tab === 'withdraw') {
+        showScreen('screen-withdraw');
+        document.getElementById('nav-withdraw').classList.add('active');
         document.getElementById('wd-balance').textContent = (serverBalance + pendingMined).toFixed(4);
         document.getElementById('user-name-wd').textContent = tgUser.first_name;
       }
     }
 
-    function copyRefLink() { navigator.clipboard.writeText(myRefLink); tg.showAlert('Copied!'); }
+    function copyRefLink() {
+      navigator.clipboard.writeText(myRefLink);
+      tg.showAlert('Copied!');
+    }
+
     function shareRefLink() {
       const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn up to 150 ZYR/day! 🚀\n\n${myRefLink}`;
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`);
     }
 
-    function requestWithdraw() {
+    async function requestWithdraw() {
       const st = document.getElementById('status-wd');
       const address = document.getElementById('wd-address').value.trim();
       const amount = parseFloat(document.getElementById('wd-amount').value);
       const total = serverBalance + pendingMined;
-      
-      if (!address || address.length < 48) { st.textContent = '❌ Enter a valid TON address.'; st.className = 'status err'; return; }
-      if (!amount || amount < 10000) { st.textContent = '❌ Minimum is 10,000 ZYR.'; st.className = 'status err'; return; }
-      if (amount > total) { st.textContent = '❌ Insufficient balance.'; st.className = 'status err'; return; }
 
-      st.textContent = '⏳ Sending request...'; st.className = 'status ok';
+      if (!address || address.length < 48) {
+        st.textContent = '❌ Enter a valid TON address.';
+        st.className = 'status err';
+        return;
+      }
+      if (!amount || amount < 10000) {
+        st.textContent = '❌ Minimum is 10,000 ZYR.';
+        st.className = 'status err';
+        return;
+      }
+      if (amount > total) {
+        st.textContent = '❌ Insufficient balance.';
+        st.className = 'status err';
+        return;
+      }
 
-      fetch(BACKEND + '/request-withdraw', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, username: tgUser.first_name, amount: amount, address: address })
-      })
-      .then(res => { if (!res.ok) throw new Error('Server error'); return res.json(); })
-      .then(data => {
-        serverBalance -= amount;
-        if (pendingMined > amount) pendingMined -= amount; else pendingMined = 0;
-        
-        updateUI(); document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
+      st.textContent = '⏳ Sending request...';
+      st.className = 'status ok';
+
+      try {
+        const res = await fetch(BACKEND + '/request-withdraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: userId,
+                username: tgUser.first_name,
+                amount: amount,
+                address: address
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: 'Server error' }));
+            throw new Error(err.detail || 'Server error');
+        }
+
+        pendingMined = 0;
+        await syncUser();
+
+        document.getElementById('pending-amount-display').textContent = amount.toLocaleString();
         showScreen('screen-pending');
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-      })
-      .catch(err => { st.textContent = '❌ ' + err.message; st.className = 'status err'; });
+      } catch (e) {
+        st.textContent = '❌ ' + e.message;
+        st.className = 'status err';
+      }
     }
 
-    // اجرای اولیه
     syncUser();
   </script>
 </body>
-  </html>
+                                                                                                                                             </html>
