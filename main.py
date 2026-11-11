@@ -182,7 +182,7 @@ async def sync_user(req: UserSyncRequest):
         user = c.fetchone()
 
     if uid == str(ADMIN_ID) and not user['has_paid']:
-        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (uid,))
+        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (current_time, uid))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
@@ -203,10 +203,10 @@ async def sync_user(req: UserSyncRequest):
         rate_per_day, level = 80, 1
 
     tokens_per_second = rate_per_day / 86400
-    last_mining = user['last_mining'] or current_time
+    last_mining = user['last_mining'] if user['last_mining'] and user['last_mining'] > 0 else current_time
     time_diff = max(0, current_time - last_mining)
 
-    # محاسبه مقدار Unclaimed Mined در سرور بر اساس زمان گذشته تا بسته نشدن و صفر شدن شمارنده با بستن مینی‌اپ
+    # محاسبه دقیق مقدار ماین شده بدون پریدن شمارنده
     pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
@@ -247,11 +247,11 @@ async def claim_mining(req: ClaimMiningRequest):
         raise HTTPException(status_code=404, detail="User not found")
         
     new_balance = user['balance'] + req.amount
-    # آپدیت موجودی و ریست کردن زمان آخرین ماین به زمان حال (برای شروع مجدد شمارنده از صفر)
+    # ثبت فوری و قطعی موجودی جدید همراه با بازنشانی تایمر به زمان جاری
     c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, time.time(), uid))
     conn.commit()
     conn.close()
-    return {"ok": True, "new_balance": new_balance}
+    return {"ok": True, "new_balance": round(new_balance, 5)}
 
 @app.post("/confirm-payment")
 async def confirm_payment(req: ConfirmPaymentRequest):
