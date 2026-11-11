@@ -203,7 +203,7 @@ async def sync_user(req: UserSyncRequest):
     last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
     time_diff = max(0, current_time - last_mining)
 
-    # محاسبه دقیق مقدار استخراج شده (حتی زمانی که مینی‌اپ بسته بوده است)
+    # محاسبه دقیق مقدار استخراج شده در زمان آفلاین بودن
     pending_mined = time_diff * tokens_per_second if user['has_paid'] else 0
 
     c.execute("SELECT u.id, u.first_name, u.has_paid, r.reward_claimed FROM referrals r JOIN users u ON r.friend_id = u.id WHERE r.referrer_id=?", (uid,))
@@ -233,40 +233,46 @@ async def sync_user(req: UserSyncRequest):
 
 @app.post("/claim-mining")
 async def claim_mining(req: ClaimMiningRequest):
-    uid = resolve_user_id(req)
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT balance, last_mining, has_paid FROM users WHERE id=?", (uid,))
-    user = c.fetchone()
-    
-    current_time = time.time()
-    
-    if not user:
-        conn.close()
-        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        uid = resolve_user_id(req)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT balance, last_mining, has_paid FROM users WHERE id=?", (uid,))
+        user = c.fetchone()
         
-    if not user['has_paid']:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Miner not activated")
-
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (uid,))
-    invited_count = c.fetchone()['count']
-    if invited_count >= 10: rate_per_day = 150
-    elif invited_count >= 6: rate_per_day = 130
-    elif invited_count >= 3: rate_per_day = 110
-    else: rate_per_day = 80
-
-    tokens_per_sec = rate_per_day / 86400
-    last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
-    time_diff = max(0, current_time - last_mining)
-    server_pending = time_diff * tokens_per_sec
-
-    new_balance = user['balance'] + server_pending
-    c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
+        current_time = time.time()
         
-    conn.commit()
-    conn.close()
-    return {"ok": True, "new_balance": round(new_balance, 5)}
+        if not user:
+            conn.close()
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        if not user['has_paid']:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Miner not activated")
+
+        c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (uid,))
+        invited_count = c.fetchone()['count']
+        
+        if invited_count >= 10: rate_per_day = 150
+        elif invited_count >= 6: rate_per_day = 130
+        elif invited_count >= 3: rate_per_day = 110
+        else: rate_per_day = 80
+
+        tokens_per_sec = rate_per_day / 86400
+        last_mining = user['last_mining'] if (user['last_mining'] and user['last_mining'] > 0) else current_time
+        time_diff = max(0, current_time - last_mining)
+        server_pending = time_diff * tokens_per_sec
+
+        new_balance = user['balance'] + server_pending
+        # آپدیت زمان شروع ماینینگ جدید به الان
+        c.execute("UPDATE users SET balance = ?, last_mining = ? WHERE id = ?", (new_balance, current_time, uid))
+            
+        conn.commit()
+        conn.close()
+        return {"ok": True, "new_balance": round(new_balance, 5)}
+    except Exception as e:
+        print(f"[CLAIM ERROR] {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/confirm-payment")
 async def confirm_payment(req: ConfirmPaymentRequest):
