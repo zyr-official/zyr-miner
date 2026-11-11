@@ -9,7 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, We
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
 # ====== تنظیمات ======
-BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAFFb-wJeEsKmNrOJSczuGGLx-CBv1TS2Ko")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc")
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/"
 CHANNEL_ID = "@ZYRMining" 
