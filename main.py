@@ -18,6 +18,7 @@ CHANNEL_ID = "@ZYRMining"
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# --- دیتابیس ---
 def get_db():
     conn = sqlite3.connect('/tmp/zyr.db')
     conn.row_factory = sqlite3.Row
@@ -38,16 +39,13 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, amount REAL, address TEXT, status TEXT)''')
     conn.commit()
     conn.close()
-
 init_db()
 
+# --- مدل‌های داده ---
 class UserSyncRequest(BaseModel):
     user_id: str
     first_name: str
     referrer_id: str | None = None
-
-class ClaimRequest(BaseModel):
-    user_id: str
 
 class WithdrawRequest(BaseModel):
     user_id: str
@@ -58,11 +56,9 @@ class WithdrawRequest(BaseModel):
 class MemberCheckRequest(BaseModel):
     user_id: str
 
+# --- API بررسی عضویت در کانال ---
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
-    if req.user_id == str(ADMIN_ID):
-        return {"isMember": True}
-        
     bot = Bot(token=BOT_TOKEN)
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=int(req.user_id))
@@ -72,105 +68,69 @@ async def check_member(req: MemberCheckRequest):
     except Exception as e:
         return {"isMember": False, "error": str(e)}
 
+# --- API سینک کردن کاربر (ورود اولیه) ---
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
-    conn = get_db()
-    c = conn.cursor()
-    
-    if req.user_id == str(ADMIN_ID):
-        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
-        user = c.fetchone()
-        if not user:
-            c.execute("INSERT INTO users (id, first_name, referrer_id, has_paid, last_mining) VALUES (?, ?, ?, 1, ?)", 
-                      (req.user_id, req.first_name, req.referrer_id, time.time()))
-        else:
-            c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
-        conn.commit()
-        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
-        user = c.fetchone()
-    else:
-        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
-        user = c.fetchone()
-        
-        if not user:
-            ref_id = req.referrer_id if req.referrer_id != req.user_id else None
-            c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
-                      (req.user_id, req.first_name, ref_id, time.time()))
-            conn.commit()
-            c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
-            user = c.fetchone()
-        else:
-            if not user['referrer_id'] and req.referrer_id and req.referrer_id != req.user_id:
-                c.execute("UPDATE users SET referrer_id=? WHERE id=?", (req.referrer_id, req.user_id))
-                conn.commit()
-                c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
-                user = c.fetchone()
-    
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
-    invited_count = c.fetchone()['count']
-
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=? AND has_paid=1", (req.user_id,))
-    active_invited = c.fetchone()['count']
-
-    inactive_invited = invited_count - active_invited
-    
-    if active_invited >= 20:
-        rate_per_day = 150
-        level = 4
-    elif active_invited >= 10:
-        rate_per_day = 130
-        level = 3
-    elif active_invited >= 5:
-        rate_per_day = 110
-        level = 2
-    else:
-        rate_per_day = 80 
-        level = 1
-    
-    tokens_per_second = rate_per_day / 86400
-    time_diff = time.time() - user['last_mining']
-    pending_earned = time_diff * tokens_per_second
-    
-    conn.close()
-
-    return {
-        "balance": round(user['balance'], 5),
-        "pending": round(pending_earned, 5),
-        "has_paid": True if req.user_id == str(ADMIN_ID) else bool(user['has_paid']),
-        "invited": invited_count,
-        "active_invited": active_invited,
-        "inactive_invited": inactive_invited,
-        "referral_earned": round(user['referral_earned'], 2),
-        "rate_per_day": rate_per_day,
-        "level": level
-    }
-
-@app.post("/claim")
-async def claim_tokens(req: ClaimRequest):
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
     user = c.fetchone()
     
+    # اگه کاربر جدیده
     if not user:
-        conn.close()
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=? AND has_paid=1", (req.user_id,))
-    active_invited = c.fetchone()['count']
-    rate_per_day = 150 if active_invited >= 20 else 130 if active_invited >= 10 else 110 if active_invited >= 5 else 80
+        c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
+                  (req.user_id, req.first_name, req.referrer_id, time.time()))
+        conn.commit()
+        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+        user = c.fetchone()
+    
+    # ✅ شرط ادمین
+    if req.user_id == str(ADMIN_ID) and not user['has_paid']:
+        c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
+        conn.commit()
+        c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
+        user = c.fetchone()
+    
+    # تعداد دوستان دعوت‌شده
+    c.execute("SELECT COUNT(*) as count FROM users WHERE referrer_id=?", (req.user_id,))
+    invited_count = c.fetchone()['count']
+    
+    # ✅ محاسبه لول و سرعت ماینینگ
+    if invited_count >= 20:
+        rate_per_day = 150
+        level = 4
+    elif invited_count >= 10:
+        rate_per_day = 130
+        level = 3
+    elif invited_count >= 5:
+        rate_per_day = 110
+        level = 2
+    else:
+        rate_per_day = 80  # لول ۱
+        level = 1
     
     tokens_per_second = rate_per_day / 86400
+    
+    # ⚠️ باگ قبلی: زمان آخرین ماینینگ با سرعت جدید محاسبه نمیشد.
+    # حالا زمان رو می‌گیریم و با سرعت جدید حساب می‌کنیم
     time_diff = time.time() - user['last_mining']
     earned = time_diff * tokens_per_second
     new_balance = user['balance'] + earned
     
     c.execute("UPDATE users SET balance=?, last_mining=? WHERE id=?", (new_balance, time.time(), req.user_id))
     conn.commit()
+    
     conn.close()
+    return {
+        "balance": round(new_balance, 5),
+        "has_paid": bool(user['has_paid']),
+        "invited": invited_count,
+        "referral_earned": round(user['referral_earned'], 2),
+        "rate_per_day": rate_per_day,
+        "level": level
+    }
 
-    return {"ok": True, "balance": round(new_balance, 5), "pending": 0}
-
+# --- API ثبت پرداخت (تاییدیه) ---
 @app.post("/confirm-payment")
 async def confirm_payment(req: MemberCheckRequest):
     conn = get_db()
@@ -180,8 +140,10 @@ async def confirm_payment(req: MemberCheckRequest):
     
     if user and not user['has_paid']:
         c.execute("UPDATE users SET has_paid=1 WHERE id=?", (req.user_id,))
+        
         if user['referrer_id']:
             c.execute("UPDATE users SET balance=balance+300, referral_earned=referral_earned+300 WHERE id=?", (user['referrer_id'],))
+        
         conn.commit()
         conn.close()
         return {"ok": True, "message": "Payment confirmed"}
@@ -189,6 +151,7 @@ async def confirm_payment(req: MemberCheckRequest):
     conn.close()
     return {"ok": False, "message": "Already paid or user not found"}
 
+# --- API برداشت ---
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
     conn = get_db()
@@ -228,16 +191,16 @@ async def get_manifest():
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png"
     })
 
-# تنظیمات تلگرام
+# --- ربات تلگرام ---
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name or "Miner"
+    
     ref_id = None
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
     
-    # ساخت لینک مینی‌اپ همراه با پارامتر رففرال
     url = WEBAPP_URL
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
@@ -249,7 +212,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 **Invite friends:** Boost your mining rate (up to 150 ZYR/day) and earn 300 ZYR per friend.\n\n"
         f"👇 **Tap below to start!**"
     )
-    keyboard = [[ InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url)) ]]
+    
+    keyboard = [[
+        InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))
+    ]]
+    
     await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 telegram_app.add_handler(CommandHandler("start", start_command))
@@ -259,8 +226,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data.split("_")
     action, wd_id, user_id, amount = data[0], data[1], data[2], float(data[3])
+
     conn = get_db()
     c = conn.cursor()
+
     if action == "approve":
         c.execute("UPDATE withdrawals SET status='approved' WHERE id=?", (wd_id,))
         await query.edit_message_text(text=f"✅ Approved {amount} ZYR for user {user_id}.")
@@ -268,6 +237,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         c.execute("UPDATE users SET balance = balance + ? WHERE id=?", (amount, user_id))
         c.execute("UPDATE withdrawals SET status='rejected' WHERE id=?", (wd_id,))
         await query.edit_message_text(text=f"❌ Rejected {amount} ZYR. Funds returned.")
+    
     conn.commit()
     conn.close()
 
@@ -278,11 +248,6 @@ async def on_startup():
     await telegram_app.initialize()
     await telegram_app.start()
 
-@app.on_event("shutdown")
-async def on_shutdown():
-    await telegram_app.stop()
-
-# نقطه دریافت وب‌هوک تلگرام
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
