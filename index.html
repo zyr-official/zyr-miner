@@ -534,7 +534,6 @@
       if (pendingMined <= 0 || isClaiming) return;
       
       isClaiming = true;
-      const claimAmount = pendingMined;
       const btn = document.getElementById('btn-claim');
       btn.disabled = true;
       const originalHtml = btn.innerHTML;
@@ -544,7 +543,7 @@
           const res = await fetch(BACKEND + '/claim-mining', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, amount: claimAmount, init_data: initData })
+              body: JSON.stringify({ user_id: userId, amount: pendingMined, init_data: initData })
           });
           const data = await res.json();
           
