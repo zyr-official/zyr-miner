@@ -94,6 +94,7 @@ async def sync_user(req: UserSyncRequest):
         user = c.fetchone()
         
         if not user:
+            # ثبت کاربر جدید همراه با شناسه معرف (جلوگیری از خود-ارتباطی)
             ref_id = req.referrer_id if req.referrer_id != req.user_id else None
             c.execute("INSERT INTO users (id, first_name, referrer_id, last_mining) VALUES (?, ?, ?, ?)", 
                       (req.user_id, req.first_name, ref_id, time.time()))
@@ -101,7 +102,7 @@ async def sync_user(req: UserSyncRequest):
             c.execute("SELECT * FROM users WHERE id=?", (req.user_id,))
             user = c.fetchone()
         else:
-            # اگر کاربر از قبل بود ولی معرف نداشت و حالا با لینک معرف آمده است
+            # اگر کاربر قبلاً ثبت شده بود اما معرف نداشت و حالا با لینک معرف آمده است
             if not user['referrer_id'] and req.referrer_id and req.referrer_id != req.user_id:
                 c.execute("UPDATE users SET referrer_id=? WHERE id=?", (req.referrer_id, req.user_id))
                 conn.commit()
@@ -238,7 +239,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0].startswith("ref_"):
         ref_id = context.args[0].replace("ref_", "")
     
-    url = WEBAPP_URL
+    # ساخت لینک مستقیم استاندارد با پشتیبانی از startapp برای مینی‌اپ
+    url = f"https://t.me/ZYRMining_bot/app"
     if ref_id:
         url += f"?startapp=ref_{ref_id}"
         
