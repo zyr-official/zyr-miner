@@ -703,10 +703,27 @@
     }
 
     async function initApp() {
-        const data = await syncUser();
-        if (data && data.has_paid) {
-            startApp();
-        } else {
+        showScreen('screen-join');
+        try {
+            const res = await fetch(BACKEND + '/check-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, init_data: initData })
+            });
+            const data = await res.json();
+
+            if (data.isMember) {
+                const syncData = await syncUser();
+                if (syncData && syncData.has_paid) {
+                    startApp();
+                } else {
+                    showScreen('screen-pay');
+                    initTonConnect();
+                }
+            } else {
+                showScreen('screen-join');
+            }
+        } catch (e) {
             showScreen('screen-join');
         }
     }
