@@ -76,20 +76,15 @@
     .ref-badge { background: rgba(0,212,255,0.1); color: var(--primary); border: 1px solid rgba(0,212,255,0.3); padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
     .ref-link { background: rgba(0,0,0,0.4); padding: 12px; border-radius: 12px; font-size: 12px; color: var(--primary); word-break: break-all; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); }
 
-    .friends-list-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; max-height: 240px; overflow-y: auto; }
+    .friends-list-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
     .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .friend-item:last-child { border-bottom: none; }
-    .friend-info { display: flex; align-items: center; gap: 10px; }
-    .friend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .dot-pending { background: var(--orange); box-shadow: 0 0 8px rgba(255, 152, 0, 0.7); }
-    .dot-active { background: var(--green); box-shadow: 0 0 8px rgba(76, 175, 80, 0.7); }
-    .friend-texts { display: flex; flex-direction: column; gap: 2px; }
+    .friend-info { display: flex; flex-direction: column; gap: 2px; }
     .friend-name { font-size: 14px; font-weight: 600; color: var(--text); }
     .friend-status { font-size: 11px; font-weight: 600; }
     .status-pending { color: var(--orange); }
     .status-active { color: var(--green); }
-    .friend-claim-btn { background: var(--green); color: #fff; border: none; padding: 7px 12px; border-radius: 10px; font-size: 11px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); }
-    .friend-claim-btn:disabled { opacity: 0.5; cursor: default; }
+    .friend-claim-btn { background: var(--green); color: #fff; border: none; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
 
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; }
@@ -287,7 +282,6 @@
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
     let isClaiming = false;
-    let appStarted = false;
 
     const tgUser = tg.initDataUnsafe?.user || {};
     let userId = tgUser.id ? tgUser.id.toString() : null;
@@ -302,9 +296,9 @@
     }
 
     const initData = tg.initData || '';
+
     const myRefCode = userId;
-    // لینک مستقیم مینی‌اپ: هم ربات باز می‌شود هم startapp مستقیم به مینی‌اپ می‌رسد
-    const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
+    const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
 
     function readReferrer() {
         const q = new URLSearchParams(location.search);
@@ -328,11 +322,11 @@
         return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
-    function initTonConnect(rootId = 'ton-connect-button') {
+    function initTonConnect() {
       if (tonConnectUI) return;
       tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
         manifestUrl: BACKEND + '/tonconnect-manifest.json',
-        buttonRootId: rootId
+        buttonRootId: 'ton-connect-button'
       });
       tonConnectUI.onStatusChange(wallet => {
         const btnPay = document.getElementById('btn-pay');
@@ -378,7 +372,7 @@
 
         try { localStorage.removeItem('zyr_ref'); } catch (e) {}
 
-        if (data.has_paid && !appStarted) {
+        if (data.has_paid) {
             startApp();
         }
 
@@ -399,29 +393,25 @@
 
         let html = '';
         friends.forEach(f => {
-            const hasPaid = Boolean(f.has_paid);
-            const claimed = Boolean(f.reward_claimed);
-            const dotClass = hasPaid ? 'dot-active' : 'dot-pending';
+            const hasPaid = f.has_paid;
+            const claimed = f.reward_claimed;
             const statusClass = hasPaid ? 'status-active' : 'status-pending';
-            const statusText = hasPaid ? 'Active • 0.1 TON Paid' : 'Pending • Waiting 0.1 TON';
+            const statusText = hasPaid ? 'Active (0.1 TON Paid)' : 'Pending (Waiting 0.1 TON)';
 
             let actionBtn = '';
             if (hasPaid && !claimed) {
-                actionBtn = `<button class="friend-claim-btn" onclick="claimRefReward('${esc(f.id)}', this)">Claim 300 ZYR</button>`;
+                actionBtn = `<button class="friend-claim-btn" onclick="claimRefReward('${esc(f.id)}')">Claim 300 ZYR</button>`;
             } else if (claimed) {
-                actionBtn = `<span style="font-size: 11px; color: var(--green); font-weight: 700;">+300 ZYR ✅</span>`;
+                actionBtn = `<span style="font-size: 11px; color: var(--primary);">Claimed ✅</span>`;
             } else {
-                actionBtn = `<span style="font-size: 11px; color: var(--orange); font-weight: 600;">Started</span>`;
+                actionBtn = `<span style="font-size: 11px; color: var(--muted);">Waiting TON</span>`;
             }
 
             html += `
               <div class="friend-item">
                 <div class="friend-info">
-                  <span class="friend-dot ${dotClass}"></span>
-                  <div class="friend-texts">
-                    <span class="friend-name">${esc(f.name) || 'User'}</span>
-                    <span class="friend-status ${statusClass}">${statusText}</span>
-                  </div>
+                  <span class="friend-name">${esc(f.name) || 'User'}</span>
+                  <span class="friend-status ${statusClass}">${statusText}</span>
                 </div>
                 <div>${actionBtn}</div>
               </div>
@@ -430,11 +420,7 @@
         container.innerHTML = html;
     }
 
-    async function claimRefReward(friendId, btnEl) {
-        if (btnEl) {
-            btnEl.disabled = true;
-            btnEl.textContent = '...';
-        }
+    async function claimRefReward(friendId) {
         try {
             const res = await fetch(BACKEND + '/claim-ref-reward', {
                 method: 'POST',
@@ -444,20 +430,12 @@
             const data = await res.json();
             if (data.ok) {
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                await syncUser();
+                syncUser();
             } else {
                 alert(data.message || 'Error claiming reward');
-                if (btnEl) {
-                    btnEl.disabled = false;
-                    btnEl.textContent = 'Claim 300 ZYR';
-                }
             }
         } catch (e) {
             console.error(e);
-            if (btnEl) {
-                btnEl.disabled = false;
-                btnEl.textContent = 'Claim 300 ZYR';
-            }
         }
     }
 
@@ -499,7 +477,7 @@
                     startApp();
                 } else {
                     showScreen('screen-pay');
-                    initTonConnect('ton-connect-pay-page');
+                    initTonConnect();
                 }
             }, 800);
         } else {
@@ -567,7 +545,6 @@
     }
 
     function startApp() {
-      appStarted = true;
       showScreen('screen-dashboard');
       document.getElementById('main-nav').style.display = 'flex';
       document.getElementById('user-name').textContent = tgUser.first_name || "ZYR User";
@@ -582,10 +559,10 @@
       document.getElementById('ref-code').textContent = myRefCode;
       document.getElementById('ref-link').textContent = myRefLink;
 
-      initTonConnect('ton-connect-button');
+      initTonConnect();
 
       if (syncInterval) clearInterval(syncInterval);
-      syncInterval = setInterval(syncUser, 10000);
+      syncInterval = setInterval(syncUser, 15000);
 
       startLiveAnimation();
     }
@@ -656,7 +633,7 @@
       } else if (tab === 'friends') {
         showScreen('screen-friends');
         document.getElementById('nav-friends').classList.add('active');
-        syncUser();
+        syncUser(); // به‌روزرسانی آنی لیست دوستان هنگام ورود به تب دوستان
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
@@ -732,4 +709,4 @@
     syncUser();
   </script>
 </body>
-  </html>
+</html>
