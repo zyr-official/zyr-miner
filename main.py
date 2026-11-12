@@ -16,20 +16,19 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, We
 from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
-# ====== تنظیمات (همه از متغیر محیطی یا مقادیر پیش‌فرض) ======
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")  # توکن ربات خود را اینجا یا در متغیر محیطی بگذارید
+# ====== تنظیمات ======
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
-DB_PATH = os.getenv("DB_PATH", "/data/zyr.db")  # مسیر پایگاه داده روی دیسک پایدار
+DB_PATH = os.getenv("DB_PATH", "/data/zyr.db")
 TON_RECEIVER = "UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24"
 PAY_AMOUNT_NANO = 100_000_000  # 0.1 TON
 TONCENTER_KEY = os.getenv("TONCENTER_KEY", "")
-ALLOW_INSECURE = os.getenv("ALLOW_INSECURE", "1") == "1"  # برای تست مینی‌اپ
+ALLOW_INSECURE = os.getenv("ALLOW_INSECURE", "1") == "1"
 MIN_WITHDRAW = 10000
-# ==========================================
-
+# =================   
 
 def get_db():
     d = os.path.dirname(DB_PATH)
@@ -38,7 +37,6 @@ def get_db():
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
-
 
 def init_db():
     conn = get_db()
@@ -70,9 +68,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 init_db()
-
 
 class UserSyncRequest(BaseModel):
     user_id: str
@@ -80,12 +76,10 @@ class UserSyncRequest(BaseModel):
     referrer_id: str | None = None
     init_data: str | None = None
 
-
 class ClaimMiningRequest(BaseModel):
     user_id: str
     amount: float | None = None
     init_data: str | None = None
-
 
 class WithdrawRequest(BaseModel):
     user_id: str
@@ -94,23 +88,19 @@ class WithdrawRequest(BaseModel):
     address: str
     init_data: str | None = None
 
-
 class MemberCheckRequest(BaseModel):
     user_id: str | None = None
     init_data: str | None = None
-
 
 class ConfirmPaymentRequest(BaseModel):
     user_id: str
     wallet: str | None = None
     init_data: str | None = None
 
-
 class ClaimRefRequest(BaseModel):
     user_id: str
     friend_id: str
     init_data: str | None = None
-
 
 def verify_init_data(init_data: str) -> str | None:
     if not init_data:
@@ -133,7 +123,6 @@ def verify_init_data(init_data: str) -> str | None:
         print(f"[verify_init_data] {e}")
         return None
 
-
 def resolve_user_id(req) -> str:
     verified = verify_init_data(getattr(req, "init_data", None) or "")
     if verified:
@@ -141,7 +130,6 @@ def resolve_user_id(req) -> str:
     if ALLOW_INSECURE and getattr(req, "user_id", None):
         return str(req.user_id)
     raise HTTPException(status_code=401, detail="Invalid Telegram session")
-
 
 def rate_for(invited: int):
     if invited >= 10:
@@ -151,7 +139,6 @@ def rate_for(invited: int):
     if invited >= 3:
         return 110, 2
     return 80, 1
-
 
 def find_referrer(c, code: str | None):
     if not code:
@@ -168,9 +155,7 @@ def find_referrer(c, code: str | None):
             return rows[0]["id"]
     return None
 
-
 def register_with_referrer(uid: str, first_name: str, code: str | None):
-    """کاربر را در لحظه استارت ربات ثبت کرده و به رفرر متصل می‌کند."""
     conn = get_db()
     try:
         c = conn.cursor()
@@ -184,7 +169,6 @@ def register_with_referrer(uid: str, first_name: str, code: str | None):
             has_ref = False
         else:
             has_ref = bool(user["referrer_id"])
-            # به‌روزرسانی نام کاربر اگر تغییر کرده باشد
             if first_name and first_name != user["first_name"]:
                 c.execute("UPDATE users SET first_name=? WHERE id=?", (first_name, uid))
 
@@ -201,9 +185,7 @@ def register_with_referrer(uid: str, first_name: str, code: str | None):
     finally:
         conn.close()
 
-
 telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -213,7 +195,6 @@ async def lifespan(app: FastAPI):
     await telegram_app.stop()
     await telegram_app.shutdown()
 
-
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
@@ -222,7 +203,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.post("/check-member")
 async def check_member(req: MemberCheckRequest):
@@ -239,11 +219,9 @@ async def check_member(req: MemberCheckRequest):
     except Exception as e:
         return {"isMember": False, "error": str(e)}
 
-
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     uid = resolve_user_id(req)
-    # ثبت مجدد یا به‌روزرسانی هنگام همگام‌سازی مینی‌اپ
     register_with_referrer(uid, req.first_name, req.referrer_id)
     
     conn = get_db()
@@ -291,7 +269,6 @@ async def sync_user(req: UserSyncRequest):
         "friends": friends,
     }
 
-
 @app.post("/claim-mining")
 async def claim_mining(req: ClaimMiningRequest):
     uid = resolve_user_id(req)
@@ -326,7 +303,6 @@ async def claim_mining(req: ClaimMiningRequest):
     finally:
         conn.close()
 
-
 async def find_payment(wallet: str) -> str | None:
     headers = {"X-API-Key": TONCENTER_KEY} if TONCENTER_KEY else {}
     url = "https://toncenter.com/api/v3/transactions"
@@ -354,7 +330,6 @@ async def find_payment(wallet: str) -> str | None:
     finally:
         conn.close()
     return None
-
 
 @app.post("/confirm-payment")
 async def confirm_payment(req: ConfirmPaymentRequest):
@@ -386,7 +361,6 @@ async def confirm_payment(req: ConfirmPaymentRequest):
         conn.close()
     return {"ok": True, "message": "Payment confirmed"}
 
-
 @app.post("/claim-ref-reward")
 async def claim_ref_reward(req: ClaimRefRequest):
     uid = resolve_user_id(req)
@@ -410,7 +384,6 @@ async def claim_ref_reward(req: ClaimRefRequest):
         return {"ok": True, "message": "300 ZYR claimed!"}
     finally:
         conn.close()
-
 
 @app.post("/request-withdraw")
 async def request_withdraw(req: WithdrawRequest):
@@ -448,7 +421,6 @@ async def request_withdraw(req: WithdrawRequest):
         print(f"[WITHDRAW] error: {e}")
     return {"ok": True}
 
-
 @app.get("/tonconnect-manifest.json")
 async def get_manifest():
     return JSONResponse({
@@ -456,7 +428,6 @@ async def get_manifest():
         "name": "ZYR Miner",
         "iconUrl": "https://zyr-official.github.io/zyr-miner/icon.png",
     })
-
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user or not update.message:
@@ -466,7 +437,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = WEBAPP_URL
     ref_code = None
 
-    # استخراج کد رفرال به محض استارت ربات (حتی قبل از باز کردن مینی‌اپ)
     if context.args and len(context.args) > 0:
         arg = context.args[0]
         if arg.startswith("ref_"):
@@ -487,7 +457,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     keyboard = [[InlineKeyboardButton("🚀 Open ZYR Miner", web_app=WebAppInfo(url=url))]]
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -523,10 +492,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
     await query.edit_message_text(text=msg)
 
-
 telegram_app.add_handler(CommandHandler("start", start_command))
 telegram_app.add_handler(CallbackQueryHandler(handle_callback))
-
 
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
@@ -540,7 +507,6 @@ async def telegram_webhook(request: Request):
     except Exception as e:
         print(f"[WEBHOOK] error: {e}")
     return {"ok": True}
-
 
 @app.get("/")
 def read_root():
