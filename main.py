@@ -17,7 +17,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
 # ====== تنظیمات ======
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
+BOT_TOKEN = "9204005359:AAGJ-532L12GA8T_w01ORxpH1HhLDl28Bqc"
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining"
