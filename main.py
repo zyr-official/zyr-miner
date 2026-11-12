@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import base64
 import sqlite3
 import hashlib
 import hmac
@@ -17,16 +18,16 @@ from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
 # ====== تنظیمات (همه از متغیر محیطی) ======
-BOT_TOKEN = os.environ["BOT_TOKEN"]  # توکن جدید بعد از /revoke
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
-DB_PATH = os.getenv("DB_PATH", "/data/zyr.db")  # حتماً روی دیسک پایدار
+DB_PATH = os.getenv("DB_PATH", "/data/zyr.db")
 TON_RECEIVER = "UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24"
 PAY_AMOUNT_NANO = 100_000_000  # 0.1 TON
 TONCENTER_KEY = os.getenv("TONCENTER_KEY", "")
-ALLOW_INSECURE = os.getenv("ALLOW_INSECURE", "0") == "1"  # فقط برای تست
+ALLOW_INSECURE = os.getenv("ALLOW_INSECURE", "0") == "1"
 MIN_WITHDRAW = 10000
 # ==========================================
 
@@ -153,8 +154,34 @@ def rate_for(invited: int):
     return 80, 1
 
 
+def normalize_ton_address(addr: str) -> str:
+    """تبدیل آدرس TON (چه Raw باشد چه EQ/UQ) به فرمت یکسان workchain:hex برای مقایسه دقیق."""
+    if not addr:
+        return ""
+    s = addr.strip()
+    if ":" in s:
+        parts = s.split(":", 1)
+        try:
+            wc = int(parts[0])
+            h = parts[1].lower()
+            if len(h) == 64:
+                return f"{wc}:{h}"
+        except ValueError:
+            pass
+        return s.lower()
+    try:
+        padded = s + "=" * (-len(s) % 4)
+        raw = base64.urlsafe_b64decode(padded)
+        if len(raw) == 36:
+            wc = int.from_bytes(raw[1:2], "big", signed=True)
+            h = raw[2:34].hex()
+            return f"{wc}:{h}"
+    except Exception:
+        pass
+    return s.lower()
+
+
 def find_referrer(c, code: str | None):
-    """کد رفرال = آیدی کامل رفرر (برای سازگاری با لینک‌های قدیمی، ۶ رقم آخر هم پذیرفته می‌شود)."""
     if not code:
         return None
     code = code.strip()
@@ -170,9 +197,8 @@ def find_referrer(c, code: str | None):
     return None
 
 
-
 def register_with_referrer(uid: str, first_name: str, code: str | None):
-    """کاربر را (اگر نبود) می‌سازد و در صورت داشتن کد معتبر، به رفرر وصل می‌کند."""
+    """کاربر را به محض استارت ثبت می‌کند تا در لیست رفرر با وضعیت نارنجی نمایش داده شود."""
     conn = get_db()
     try:
         c = conn.cursor()
@@ -184,6 +210,8 @@ def register_with_referrer(uid: str, first_name: str, code: str | None):
             has_ref = False
         else:
             has_ref = bool(user["referrer_id"])
+            if first_name and user["first_name"] != first_name:
+                c.execute("UPDATE users SET first_name=? WHERE id=?", (first_name, uid))
         if code and not has_ref:
             ref_id = find_referrer(c, code)
             if ref_id and ref_id != uid:
@@ -253,11 +281,9 @@ async def sync_user(req: UserSyncRequest):
         c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
 
-    # ثبت رفرال: اگر کاربر هنوز رفرر ندارد و کد معتبر آمده (حتی اگر قبلاً ساخته شده باشد)
     if not user["referrer_id"] and req.referrer_id:
         ref_id = find_referrer(c, req.referrer_id)
         if ref_id and ref_id != uid:
-            # جلوگیری از حلقه: رفرر نباید خودش از زیرمجموعه‌های این کاربر باشد
             c.execute("SELECT referrer_id FROM users WHERE id=?", (ref_id,))
             r = c.fetchone()
             if not (r and r["referrer_id"] == uid):
@@ -284,7 +310,8 @@ async def sync_user(req: UserSyncRequest):
     pending = max(0, now - last) * rate / 86400 if user["has_paid"] else 0
 
     c.execute("""SELECT u.id, u.first_name, u.has_paid, r.reward_claimed
-                 FROM referrals r JOIN users u ON r.friend_id=u.id WHERE r.referrer_id=?""", (uid,))
+                 FROM referrals r JOIN users u ON r.friend_id=u.id
+                 WHERE r.referrer_id=? ORDER BY r.id DESC""", (uid,))
     friends = [{
         "id": r["id"],
         "name": r["first_name"],
@@ -350,18 +377,18 @@ async def find_payment(wallet: str) -> str | None:
         r = await client.get(url, params=params, headers=headers)
         r.raise_for_status()
         txs = r.json().get("transactions", [])
-    w = wallet.strip().lower()
+    w = normalize_ton_address(wallet)
     cutoff = time.time() - 3600
     conn = get_db()
     try:
         for tx in txs:
             msg = tx.get("in_msg") or {}
-            src = (msg.get("source") or "").lower()
+            src = normalize_ton_address(msg.get("source") or "")
             try:
                 value = int(msg.get("value") or 0)
             except ValueError:
                 continue
-            if src == w and value >= PAY_AMOUNT_NANO and tx.get("now", 0) >= cutoff:
+            if src and src == w and value >= PAY_AMOUNT_NANO and tx.get("now", 0) >= cutoff:
                 h = tx.get("hash")
                 used = conn.execute("SELECT 1 FROM payments WHERE tx_hash=?", (h,)).fetchone()
                 if not used:
@@ -482,10 +509,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ref_code = None
     if context.args and context.args[0].startswith("ref_"):
         ref_code = context.args[0][4:]
-        # با ?startapp= در فرانت از location.search خوانده می‌شود
         url += f"?startapp={context.args[0]}"
     try:
-        # همین‌جا ثبت می‌شود تا دوست بلافاصله (نارنجی) در لیست رفرر دیده شود
         register_with_referrer(uid, name, ref_code)
     except Exception as e:
         print(f"[START] register error: {e}")
