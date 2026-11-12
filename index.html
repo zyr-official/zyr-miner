@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
   <title>ZYR Miner</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
@@ -33,7 +33,7 @@
     .profile-img img { width: 100%; height: 100%; object-fit: cover; }
     .profile-name h2 { font-size: 17px; font-weight: 700; }
     .profile-name p { font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.5px; }
-    
+
     #ton-connect-container { display: flex; justify-content: center; width: 100%; margin-bottom: 20px; }
     #ton-connect-button { width: 100%; display: flex; justify-content: center; }
     #ton-connect-button > div { width: 100% !important; max-width: 100% !important; }
@@ -50,7 +50,7 @@
     .engine-status .pulse { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: blink 0.8s infinite; }
     .engine-rate { font-size: 22px; font-weight: 700; color: var(--text); }
     .engine-rate span { font-size: 13px; color: var(--muted); font-weight: 500; }
-    
+
     .live-mining-box { background: rgba(0, 212, 255, 0.05); border: 1px dashed rgba(0, 212, 255, 0.3); border-radius: 20px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .live-mining-title { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
     .live-mining-amount { font-size: 22px; font-weight: 700; color: var(--primary); display: flex; gap: 6px; align-items: baseline; }
@@ -59,7 +59,7 @@
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 8px; backdrop-filter: blur(10px); }
     .stat-header { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 600; }
     .stat-value { font-size: 18px; font-weight: 700; }
-    
+
     .claim-action { width: 100%; padding: 20px; border: none; border-radius: 24px; background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); border: 1px solid rgba(0,212,255,0.4); color: var(--primary); font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.1); }
     .claim-action:active { transform: scale(0.97); }
 
@@ -75,7 +75,7 @@
     .ref-code { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
     .ref-badge { background: rgba(0,212,255,0.1); color: var(--primary); border: 1px solid rgba(0,212,255,0.3); padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
     .ref-link { background: rgba(0,0,0,0.4); padding: 12px; border-radius: 12px; font-size: 12px; color: var(--primary); word-break: break-all; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); }
-    
+
     .friends-list-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
     .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .friend-item:last-child { border-bottom: none; }
@@ -184,7 +184,7 @@
         <h1>Friends</h1>
         <p>Invite friends and earn 300 ZYR when they pay 0.1 TON!</p>
       </div>
-      
+
       <div class="info-box">
         <strong>Boost Levels:</strong><br>
         • Level 1 (0 invited): 80 ZYR/day<br>
@@ -227,10 +227,10 @@
       <div class="ref-box">
         <div class="ref-label">TON Wallet Address</div>
         <input type="text" id="wd-address" class="input-field" placeholder="UQ...">
-        
+
         <div class="ref-label">Amount (ZYR)</div>
         <input type="number" id="wd-amount" class="input-field" placeholder="10000" style="font-family: sans-serif; font-weight: 600;">
-        
+
         <div class="percent-buttons">
           <button class="pct-btn" onclick="setWithdrawPercent(0.25)">25%</button>
           <button class="pct-btn" onclick="setWithdrawPercent(0.50)">50%</button>
@@ -275,6 +275,7 @@
 
     const BACKEND = 'https://nann.pingooshop.ir';
     const TON_RECEIVER = 'UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24';
+    const BOT_APP_LINK = 'https://t.me/ZYRMining_bot/app';
 
     let tonConnectUI, syncInterval, animateInterval;
     let serverBalance = 0;
@@ -296,13 +297,35 @@
     }
 
     const initData = tg.initData || '';
-    const myRefCode = userId.slice(-6).toUpperCase();
-    const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
 
-    let referrerId = null;
-    const startParam = tg.initDataUnsafe?.start_param || "";
-    if (startParam.startsWith('ref_')) {
-        referrerId = startParam.replace('ref_', '');
+    // کد رفرال = آیدی کامل کاربر (یکتا، بدون تداخل)
+    const myRefCode = userId;
+    const myRefLink = `${BOT_APP_LINK}?startapp=ref_${myRefCode}`;
+
+    // خواندن رفرر از همه مسیرهای ممکن:
+    // 1) لینک t.me/bot/app?startapp=ref_X  -> start_param
+    // 2) دکمه /start ref_X در ربات        -> ?startapp=ref_X در URL
+    // 3) ذخیره‌شده از دفعه قبل (اگر اولین sync شکست خورده باشد)
+    function readReferrer() {
+        const q = new URLSearchParams(location.search);
+        const hashQ = new URLSearchParams(location.hash.replace(/^#/, '').replace(/^\?/, ''));
+        const raw = tg.initDataUnsafe?.start_param
+            || q.get('startapp') || q.get('tgWebAppStartParam')
+            || hashQ.get('tgWebAppStartParam') || '';
+        if (raw.startsWith('ref_')) {
+            const code = raw.slice(4);
+            if (/^[A-Za-z0-9]{1,20}$/.test(code)) {
+                try { localStorage.setItem('zyr_ref', code); } catch (e) {}
+                return code;
+            }
+        }
+        try { return localStorage.getItem('zyr_ref'); } catch (e) { return null; }
+    }
+    let referrerId = readReferrer();
+    if (referrerId === myRefCode || referrerId === myRefCode.slice(-6).toUpperCase()) referrerId = null;
+
+    function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
     function initTonConnect() {
@@ -353,6 +376,9 @@
             document.getElementById('user-level').textContent = `Level ${data.level}`;
         }
 
+        // رفرال ثبت شد؛ دیگر لازم نیست ذخیره بماند
+        try { localStorage.removeItem('zyr_ref'); } catch (e) {}
+
         if (data.has_paid) {
             startApp();
         }
@@ -378,10 +404,10 @@
             const claimed = f.reward_claimed;
             const statusClass = hasPaid ? 'status-active' : 'status-pending';
             const statusText = hasPaid ? 'Active (0.1 TON Paid)' : 'Pending (No TON)';
-            
+
             let actionBtn = '';
             if (hasPaid && !claimed) {
-                actionBtn = `<button class="friend-claim-btn" onclick="claimRefReward('${f.id}')">Claim 300 ZYR</button>`;
+                actionBtn = `<button class="friend-claim-btn" onclick="claimRefReward('${esc(f.id)}')">Claim 300 ZYR</button>`;
             } else if (claimed) {
                 actionBtn = `<span style="font-size: 11px; color: var(--primary);">Claimed ✅</span>`;
             } else {
@@ -391,7 +417,7 @@
             html += `
               <div class="friend-item">
                 <div class="friend-info">
-                  <span class="friend-name">${f.name || 'User'}</span>
+                  <span class="friend-name">${esc(f.name) || 'User'}</span>
                   <span class="friend-status ${statusClass}">${statusText}</span>
                 </div>
                 <div>${actionBtn}</div>
@@ -481,46 +507,48 @@
       st.className = 'status';
       btn.disabled = true;
 
+      const wallet = tonConnectUI.account.address; // raw: 0:abc...
+
       try {
         const tx = {
             validUntil: Math.floor(Date.now() / 1000) + 600,
             messages: [{ address: TON_RECEIVER, amount: '100000000' }]
         };
         await tonConnectUI.sendTransaction(tx);
-
-        st.textContent = '⏳ Verifying payment...';
-        st.className = 'status ok';
-
-        // تلاش برای تایید پرداخت با چند بار تکرار در صورت تاخیر شبکه
-        let paidConfirmed = false;
-        for (let i = 0; i < 3; i++) {
-            try {
-                const payRes = await fetch(BACKEND + '/confirm-payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId, init_data: initData })
-                });
-                if (payRes.ok) {
-                    paidConfirmed = true;
-                    break;
-                }
-            } catch (err) {
-                console.log('Retry confirm payment...', err);
-            }
-            await new Promise(r => setTimeout(r, 2000));
-        }
-
-        const data = await syncUser();
-        if (data?.has_paid || paidConfirmed) {
-            startApp();
-        } else {
-            st.textContent = '⚠️ Payment recorded, please restart app.';
-            setTimeout(() => startApp(), 2000);
-        }
       } catch (e) {
         st.textContent = '❌ Cancelled or failed.';
         st.className = 'status err';
         btn.disabled = false;
+        return;
+      }
+
+      st.textContent = '⏳ Verifying payment on blockchain...';
+      st.className = 'status ok';
+
+      // تراکنش چند ثانیه تا چند ده ثانیه طول می‌کشد تا روی بلاکچین بنشیند
+      let confirmed = false;
+      for (let i = 0; i < 18 && !confirmed; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+              const payRes = await fetch(BACKEND + '/confirm-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: userId, wallet: wallet, init_data: initData })
+              });
+              if (payRes.ok) confirmed = true;
+              else if (payRes.status === 409) break;
+          } catch (err) {
+              console.log('Retry confirm payment...', err);
+          }
+      }
+
+      const data = await syncUser();
+      if (data?.has_paid || confirmed) {
+          startApp();
+      } else {
+          st.textContent = '⚠️ Payment not detected yet. Reopen the app in a minute.';
+          st.className = 'status err';
+          btn.disabled = false;
       }
     }
 
@@ -529,8 +557,11 @@
       document.getElementById('main-nav').style.display = 'flex';
       document.getElementById('user-name').textContent = tgUser.first_name || "ZYR User";
       if (tgUser.photo_url) {
-        const imgHtml = `<img src="${tgUser.photo_url}">`;
-        document.getElementById('user-avatar').innerHTML = imgHtml;
+        const img = document.createElement('img');
+        img.src = tgUser.photo_url;
+        const av = document.getElementById('user-avatar');
+        av.innerHTML = '';
+        av.appendChild(img);
       }
 
       document.getElementById('ref-code').textContent = myRefCode;
@@ -546,9 +577,8 @@
 
     async function claimTokens() {
       if (pendingMined <= 0 || isClaiming) return;
-      
+
       isClaiming = true;
-      const claimAmount = pendingMined;
       const btn = document.getElementById('btn-claim');
       btn.disabled = true;
       const originalHtml = btn.innerHTML;
@@ -558,9 +588,9 @@
           const res = await fetch(BACKEND + '/claim-mining', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, amount: claimAmount, init_data: initData })
+              body: JSON.stringify({ user_id: userId, init_data: initData })
           });
-          
+
           const textResponse = await res.text();
           let data;
           try {
@@ -568,17 +598,17 @@
           } catch (err) {
               throw new Error("پاسخ سرور نامعتبر است");
           }
-          
+
           if (res.ok && data.ok) {
               pendingMined = 0;
               serverBalance = data.new_balance;
               updateUI();
 
               if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-              
+
               btn.innerHTML = '✅ Claimed & Added!';
-              setTimeout(() => { 
-                  btn.innerHTML = originalHtml; 
+              setTimeout(() => {
+                  btn.innerHTML = originalHtml;
                   btn.disabled = false;
                   isClaiming = false;
               }, 2000);
@@ -602,7 +632,7 @@
 
     function switchTab(tab) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-      
+
       if (tab === 'mining') {
         showScreen('screen-dashboard');
         document.getElementById('nav-mining').classList.add('active');
@@ -628,7 +658,7 @@
     }
 
     function shareRefLink() {
-      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn ZYR! 🚀\n\n${myRefLink}`;
+      const text = `Join ZYR Cloud Mining! Deposit 0.1 TON, start mining and earn ZYR! 🚀`;
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(myRefLink)}&text=${encodeURIComponent(text)}`);
     }
 
