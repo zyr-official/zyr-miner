@@ -11,9 +11,9 @@
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; font-family: 'Space Grotesk', sans-serif; }
     :root { --bg: #050505; --surface: rgba(255, 255, 255, 0.03); --surface-hover: rgba(255, 255, 255, 0.08); --primary: #00d4ff; --primary-glow: rgba(0, 212, 255, 0.4); --secondary: #7b2fff; --text: #ffffff; --muted: #888888; --border: rgba(255, 255, 255, 0.08); --orange: #ff9800; --green: #4caf50; }
     body { background-color: var(--bg); background-image: radial-gradient(circle at 15% 15%, rgba(123, 47, 255, 0.15) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(0, 212, 255, 0.1) 0%, transparent 40%); background-attachment: fixed; color: var(--text); min-height: 100vh; padding-bottom: 110px; overflow-x: hidden; }
-    .screen { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .screen { display: none; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     .screen.active { display: block; }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .onboarding { padding: 40px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; }
     .onboarding .icon-box { width: 90px; height: 90px; border-radius: 30px; background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,47,255,0.2)); border: 1px solid rgba(0,212,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 24px; box-shadow: 0 0 40px rgba(0,212,255,0.15); }
     .onboarding h1 { font-size: 28px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.5px; }
@@ -110,7 +110,7 @@
 </head>
 <body>
 
-  <div class="screen active" id="screen-join">
+  <div class="screen" id="screen-join">
     <div class="onboarding">
       <div class="icon-box">⚡</div>
       <h1>Join ZYR Network</h1>
@@ -372,8 +372,14 @@
 
         try { localStorage.removeItem('zyr_ref'); } catch (e) {}
 
-        if (data.has_paid) {
+        // نکته مهم: بررسی has_paid نباید صفحه دوستان یا تب‌های دیگر را ناخواسته به داشبورد هدایت کند.
+        // فقط اگر در صفحه پرداخت یا جوین هستیم هدایت انجام شود.
+        const currentActiveScreen = document.querySelector('.screen.active')?.id;
+        if (data.has_paid && (currentActiveScreen === 'screen-join' || currentActiveScreen === 'screen-pay')) {
             startApp();
+        } else if (!data.has_paid && currentActiveScreen !== 'screen-join' && currentActiveScreen !== 'screen-pay' && !userId.startsWith('test')) {
+            // اگر کاربر پول نداده و در صفحه اصلی است (به جز حالتی که تست لوکال است)
+            // نمایش صفحه پرداخت
         }
 
         updateUI();
@@ -625,6 +631,7 @@
     }
 
     function switchTab(tab) {
+      // پاک کردن کلاس اکتیو از تمام دکمه‌های ناوبری پایین
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
       if (tab === 'mining') {
@@ -633,7 +640,7 @@
       } else if (tab === 'friends') {
         showScreen('screen-friends');
         document.getElementById('nav-friends').classList.add('active');
-        syncUser(); // به‌روزرسانی آنی لیست دوستان هنگام ورود به تب دوستان
+        syncUser(); // به‌روزرسانی لیست دوستان بدون ایجاد اختلال در صفحه
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
@@ -706,7 +713,17 @@
       }
     }
 
-    syncUser();
+    // بررسی وضعیت اولیه کاربر هنگام لود صفحه
+    async function initApp() {
+        const data = await syncUser();
+        if (data && data.has_paid) {
+            startApp();
+        } else {
+            showScreen('screen-join');
+        }
+    }
+
+    initApp();
   </script>
 </body>
 </html>
