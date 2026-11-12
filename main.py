@@ -484,11 +484,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ref_code = context.args[0][4:]
         # با ?startapp= در فرانت از location.search خوانده می‌شود
         url += f"?startapp={context.args[0]}"
+    print(f"[START] uid={uid} args={context.args} ref_code={ref_code}")
     try:
         # همین‌جا ثبت می‌شود تا دوست بلافاصله (نارنجی) در لیست رفرر دیده شود
         register_with_referrer(uid, name, ref_code)
+        conn = get_db()
+        row = conn.execute("SELECT referrer_id FROM users WHERE id=?", (uid,)).fetchone()
+        conn.close()
+        print(f"[START] saved referrer_id={row['referrer_id'] if row else None}")
     except Exception as e:
-        print(f"[START] register error: {e}")
+        print(f"[START] register error: {e!r}")
 
     text = (
         f"⚡ Welcome to ZYR Cloud Miner, {name}!\n\n"
