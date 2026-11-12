@@ -372,16 +372,6 @@
 
         try { localStorage.removeItem('zyr_ref'); } catch (e) {}
 
-        // نکته مهم: بررسی has_paid نباید صفحه دوستان یا تب‌های دیگر را ناخواسته به داشبورد هدایت کند.
-        // فقط اگر در صفحه پرداخت یا جوین هستیم هدایت انجام شود.
-        const currentActiveScreen = document.querySelector('.screen.active')?.id;
-        if (data.has_paid && (currentActiveScreen === 'screen-join' || currentActiveScreen === 'screen-pay')) {
-            startApp();
-        } else if (!data.has_paid && currentActiveScreen !== 'screen-join' && currentActiveScreen !== 'screen-pay' && !userId.startsWith('test')) {
-            // اگر کاربر پول نداده و در صفحه اصلی است (به جز حالتی که تست لوکال است)
-            // نمایش صفحه پرداخت
-        }
-
         updateUI();
         return data;
       } catch (e) {
@@ -462,7 +452,7 @@
     async function checkMembership() {
       const st = document.getElementById('status-join');
       const btn = document.getElementById('btn-next-1');
-      st.textContent = 'Checking membership...';
+      st.textContent = 'در حال بررسی عضویت...';
       st.className = 'status';
       btn.disabled = true;
 
@@ -475,7 +465,7 @@
         const data = await res.json();
 
         if (data.isMember) {
-            st.textContent = '✅ Verified! Proceeding...';
+            st.textContent = '✅ عضویت تایید شد!';
             st.className = 'status ok';
             const syncData = await syncUser();
             setTimeout(() => {
@@ -487,12 +477,12 @@
                 }
             }, 800);
         } else {
-            st.textContent = '❌ You must join the channel first.';
+            st.textContent = '❌ شما هنوز در کانال عضو نیستید یا از آن خارج شده‌اید!';
             st.className = 'status err';
             btn.disabled = false;
         }
       } catch (e) {
-        st.textContent = '❌ Network error.';
+        st.textContent = '❌ خطای ارتباط با سرور.';
         st.className = 'status err';
         btn.disabled = false;
       }
@@ -631,7 +621,6 @@
     }
 
     function switchTab(tab) {
-      // پاک کردن کلاس اکتیو از تمام دکمه‌های ناوبری پایین
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
       if (tab === 'mining') {
@@ -640,7 +629,7 @@
       } else if (tab === 'friends') {
         showScreen('screen-friends');
         document.getElementById('nav-friends').classList.add('active');
-        syncUser(); // به‌روزرسانی لیست دوستان بدون ایجاد اختلال در صفحه
+        syncUser();
       } else if (tab === 'withdraw') {
         showScreen('screen-withdraw');
         document.getElementById('nav-withdraw').classList.add('active');
@@ -713,7 +702,6 @@
       }
     }
 
-    // بررسی وضعیت اولیه کاربر هنگام لود صفحه
     async function initApp() {
         const data = await syncUser();
         if (data && data.has_paid) {
