@@ -217,6 +217,7 @@ async def check_member(req: MemberCheckRequest):
         )
         return {"isMember": ok}
     except Exception as e:
+        print(f"[Check Member Error]: {e}")
         return {"isMember": False, "error": str(e)}
 
 @app.post("/sync-user")
