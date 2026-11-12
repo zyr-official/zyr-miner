@@ -303,7 +303,8 @@
 
     const initData = tg.initData || '';
     const myRefCode = userId;
-    const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
+    // لینک مستقیم مینی‌اپ: هم ربات باز می‌شود هم startapp مستقیم به مینی‌اپ می‌رسد
+    const myRefLink = `https://t.me/ZYRMining_bot/app?startapp=ref_${myRefCode}`;
 
     function readReferrer() {
         const q = new URLSearchParams(location.search);
