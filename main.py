@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import base64
 import sqlite3
 import hashlib
 import hmac
@@ -17,17 +16,17 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot, Update, We
 from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, CommandHandler
 
-# ====== تنظیمات (همه از متغیر محیطی) ======
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+# ====== تنظیمات (همه از متغیر محیطی یا مقادیر پیش‌فرض) ======
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")  # توکن ربات خود را اینجا یا در متغیر محیطی بگذارید
 ADMIN_ID = 1839907139
 WEBAPP_URL = "https://zyr-official.github.io/zyr-miner/app.html"
 CHANNEL_ID = "@ZYRMining"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
-DB_PATH = os.getenv("DB_PATH", "/data/zyr.db")
+DB_PATH = os.getenv("DB_PATH", "/data/zyr.db")  # مسیر پایگاه داده روی دیسک پایدار
 TON_RECEIVER = "UQBke3M55AgQ7qRoAHf1Li9t_c-ZEjnugAmMZ5cTRCg1oo24"
 PAY_AMOUNT_NANO = 100_000_000  # 0.1 TON
 TONCENTER_KEY = os.getenv("TONCENTER_KEY", "")
-ALLOW_INSECURE = os.getenv("ALLOW_INSECURE", "0") == "1"
+ALLOW_INSECURE = os.getenv("ALLOW_INSECURE", "1") == "1"  # برای تست مینی‌اپ
 MIN_WITHDRAW = 10000
 # ==========================================
 
@@ -154,33 +153,6 @@ def rate_for(invited: int):
     return 80, 1
 
 
-def normalize_ton_address(addr: str) -> str:
-    """تبدیل آدرس TON (چه Raw باشد چه EQ/UQ) به فرمت یکسان workchain:hex برای مقایسه دقیق."""
-    if not addr:
-        return ""
-    s = addr.strip()
-    if ":" in s:
-        parts = s.split(":", 1)
-        try:
-            wc = int(parts[0])
-            h = parts[1].lower()
-            if len(h) == 64:
-                return f"{wc}:{h}"
-        except ValueError:
-            pass
-        return s.lower()
-    try:
-        padded = s + "=" * (-len(s) % 4)
-        raw = base64.urlsafe_b64decode(padded)
-        if len(raw) == 36:
-            wc = int.from_bytes(raw[1:2], "big", signed=True)
-            h = raw[2:34].hex()
-            return f"{wc}:{h}"
-    except Exception:
-        pass
-    return s.lower()
-
-
 def find_referrer(c, code: str | None):
     if not code:
         return None
@@ -198,20 +170,24 @@ def find_referrer(c, code: str | None):
 
 
 def register_with_referrer(uid: str, first_name: str, code: str | None):
-    """کاربر را به محض استارت ثبت می‌کند تا در لیست رفرر با وضعیت نارنجی نمایش داده شود."""
+    """کاربر را در لحظه استارت ربات ثبت کرده و به رفرر متصل می‌کند."""
     conn = get_db()
     try:
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
+        now = time.time()
+        
         if not user:
             c.execute("INSERT INTO users (id, first_name, last_mining) VALUES (?,?,?)",
-                      (uid, first_name, time.time()))
+                      (uid, first_name, now))
             has_ref = False
         else:
             has_ref = bool(user["referrer_id"])
-            if first_name and user["first_name"] != first_name:
+            # به‌روزرسانی نام کاربر اگر تغییر کرده باشد
+            if first_name and first_name != user["first_name"]:
                 c.execute("UPDATE users SET first_name=? WHERE id=?", (first_name, uid))
+
         if code and not has_ref:
             ref_id = find_referrer(c, code)
             if ref_id and ref_id != uid:
@@ -241,7 +217,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://zyr-official.github.io"],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -267,37 +243,20 @@ async def check_member(req: MemberCheckRequest):
 @app.post("/sync-user")
 async def sync_user(req: UserSyncRequest):
     uid = resolve_user_id(req)
+    # ثبت مجدد یا به‌روزرسانی هنگام همگام‌سازی مینی‌اپ
+    register_with_referrer(uid, req.first_name, req.referrer_id)
+    
     conn = get_db()
     c = conn.cursor()
-    now = time.time()
-
+    
     c.execute("SELECT * FROM users WHERE id=?", (uid,))
     user = c.fetchone()
 
-    if not user:
-        c.execute("INSERT INTO users (id, first_name, last_mining) VALUES (?,?,?)",
-                  (uid, req.first_name, now))
+    if uid == str(ADMIN_ID) and not user["has_paid"]:
+        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (time.time(), uid))
         conn.commit()
         c.execute("SELECT * FROM users WHERE id=?", (uid,))
         user = c.fetchone()
-
-    if not user["referrer_id"] and req.referrer_id:
-        ref_id = find_referrer(c, req.referrer_id)
-        if ref_id and ref_id != uid:
-            c.execute("SELECT referrer_id FROM users WHERE id=?", (ref_id,))
-            r = c.fetchone()
-            if not (r and r["referrer_id"] == uid):
-                c.execute("UPDATE users SET referrer_id=? WHERE id=?", (ref_id, uid))
-                c.execute("INSERT OR IGNORE INTO referrals (referrer_id, friend_id, reward_claimed) VALUES (?,?,0)",
-                          (ref_id, uid))
-                conn.commit()
-
-    if uid == str(ADMIN_ID) and not user["has_paid"]:
-        c.execute("UPDATE users SET has_paid=1, last_mining=? WHERE id=?", (now, uid))
-        conn.commit()
-
-    c.execute("SELECT * FROM users WHERE id=?", (uid,))
-    user = c.fetchone()
 
     c.execute("SELECT COUNT(*) AS n FROM referrals WHERE referrer_id=?", (uid,))
     invited = c.fetchone()["n"]
@@ -306,12 +265,12 @@ async def sync_user(req: UserSyncRequest):
     active = c.fetchone()["n"]
 
     rate, level = rate_for(invited)
+    now = time.time()
     last = user["last_mining"] if user["last_mining"] and user["last_mining"] > 0 else now
     pending = max(0, now - last) * rate / 86400 if user["has_paid"] else 0
 
     c.execute("""SELECT u.id, u.first_name, u.has_paid, r.reward_claimed
-                 FROM referrals r JOIN users u ON r.friend_id=u.id
-                 WHERE r.referrer_id=? ORDER BY r.id DESC""", (uid,))
+                 FROM referrals r JOIN users u ON r.friend_id=u.id WHERE r.referrer_id=?""", (uid,))
     friends = [{
         "id": r["id"],
         "name": r["first_name"],
@@ -369,7 +328,6 @@ async def claim_mining(req: ClaimMiningRequest):
 
 
 async def find_payment(wallet: str) -> str | None:
-    """تراکنش ورودی >= 0.1 TON از کیف پول کاربر به آدرس ما را در بلاکچین پیدا می‌کند."""
     headers = {"X-API-Key": TONCENTER_KEY} if TONCENTER_KEY else {}
     url = "https://toncenter.com/api/v3/transactions"
     params = {"account": TON_RECEIVER, "limit": 50, "sort": "desc"}
@@ -377,18 +335,18 @@ async def find_payment(wallet: str) -> str | None:
         r = await client.get(url, params=params, headers=headers)
         r.raise_for_status()
         txs = r.json().get("transactions", [])
-    w = normalize_ton_address(wallet)
+    w = wallet.strip().lower()
     cutoff = time.time() - 3600
     conn = get_db()
     try:
         for tx in txs:
             msg = tx.get("in_msg") or {}
-            src = normalize_ton_address(msg.get("source") or "")
+            src = (msg.get("source") or "").lower()
             try:
                 value = int(msg.get("value") or 0)
             except ValueError:
                 continue
-            if src and src == w and value >= PAY_AMOUNT_NANO and tx.get("now", 0) >= cutoff:
+            if src == w and value >= PAY_AMOUNT_NANO and tx.get("now", 0) >= cutoff:
                 h = tx.get("hash")
                 used = conn.execute("SELECT 1 FROM payments WHERE tx_hash=?", (h,)).fetchone()
                 if not used:
@@ -507,9 +465,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
     url = WEBAPP_URL
     ref_code = None
-    if context.args and context.args[0].startswith("ref_"):
-        ref_code = context.args[0][4:]
-        url += f"?startapp={context.args[0]}"
+
+    # استخراج کد رفرال به محض استارت ربات (حتی قبل از باز کردن مینی‌اپ)
+    if context.args and len(context.args) > 0:
+        arg = context.args[0]
+        if arg.startswith("ref_"):
+            ref_code = arg[4:]
+            url += f"?startapp={arg}"
+
     try:
         register_with_referrer(uid, name, ref_code)
     except Exception as e:
