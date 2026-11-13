@@ -63,6 +63,18 @@
     .claim-action { width: 100%; padding: 20px; border: none; border-radius: 24px; background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15)); border: 1px solid rgba(0,212,255,0.4); color: var(--primary); font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.1); }
     .claim-action:active { transform: scale(0.97); }
 
+    .checkin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 18px; margin-bottom: 16px; backdrop-filter: blur(10px); }
+    .checkin-title { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .checkin-title span { font-size: 11px; color: var(--muted); font-weight: 500; }
+    .checkin-days { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 14px; }
+    .day-chip { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px; padding: 8px 0; text-align: center; font-size: 10px; color: var(--muted); font-weight: 600; }
+    .day-chip b { display: block; font-size: 13px; color: var(--text); margin-top: 2px; }
+    .day-chip.done { background: rgba(76,175,80,0.15); border-color: rgba(76,175,80,0.5); color: var(--green); }
+    .day-chip.done b { color: var(--green); }
+    .day-chip.today { border-color: var(--primary); box-shadow: 0 0 12px var(--primary-glow); color: var(--primary); }
+    .day-chip.today b { color: var(--primary); }
+    .checkin-btn { width: 100%; padding: 14px; border: none; border-radius: 16px; background: var(--primary); color: #000; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .checkin-btn:disabled { background: rgba(255,255,255,0.06); color: var(--muted); cursor: default; }
     .friends-header { margin-bottom: 16px; }
     .friends-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
     .friends-header p { color: var(--muted); font-size: 13px; line-height: 1.5; }
@@ -128,7 +140,7 @@
       <p>Deposit a one-time fee of 0.1 TON to deploy your cloud miner. Yield starts instantly.</p>
       <div style="font-size: 48px; font-weight: 700; color: var(--primary); margin-bottom: 24px;">0.1 <span style="font-size: 20px; color: var(--muted);">TON</span></div>
       <div id="ton-connect-pay-page" style="width: 100%; display: flex; justify-content: center; margin-bottom: 20px;"></div>
-      <button class="btn btn-primary" id="btn-pay" onclick="payTON()" disabled>Deploy Miner</button>
+      <button class="btn btn-primary" id="btn-pay" onclick="payTON()">Connect Wallet</button>
       <div class="status" id="status-pay"></div>
     </div>
   </div>
@@ -172,6 +184,12 @@
         <div class="stat-card"><div class="stat-header">Boost Rate</div><div class="stat-value">x1.0</div></div>
       </div>
 
+      <div class="checkin-card">
+        <div class="checkin-title">🎁 Daily Check-in <span>resets 00:00 Tehran</span></div>
+        <div class="checkin-days" id="checkin-days"></div>
+        <button class="checkin-btn" id="btn-checkin" onclick="claimDaily()" disabled>Loading...</button>
+      </div>
+
       <button class="claim-action" id="btn-claim" onclick="claimTokens()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Claim Mined ZYR
       </button>
@@ -187,10 +205,10 @@
 
       <div class="info-box">
         <strong>Boost Levels:</strong><br>
-        • Level 1 (0 invited): 80 ZYR/day<br>
-        • Level 2 (3 invited): 110 ZYR/day<br>
-        • Level 3 (6 invited): 130 ZYR/day<br>
-        • Level 4 (10 invited): 150 ZYR/day<br><br>
+        • Level 1 (0 active friends): 80 ZYR/day<br>
+        • Level 2 (3 active friends): 110 ZYR/day<br>
+        • Level 3 (6 active friends): 130 ZYR/day<br>
+        • Level 4 (10 active friends): 150 ZYR/day<br>(active = friend who paid 0.1 TON)<br><br>
         <span style="color: var(--primary);">💡 Note: When your referral pays 0.1 TON, you get 300 ZYR!</span>
       </div>
 
@@ -283,6 +301,8 @@
     let currentRatePerDay = 80;
     let tokensPerSecond = currentRatePerDay / 86400;
     let isClaiming = false;
+    let appStarted = false;
+    let lastCheckin = null;
 
     const tgUser = tg.initDataUnsafe?.user || {};
     let userId = tgUser.id ? tgUser.id.toString() : null;
@@ -300,7 +320,7 @@
 
     // کد رفرال = آیدی کامل کاربر (یکتا، بدون تداخل)
     const myRefCode = userId;
-    const myRefLink = `${BOT_APP_LINK}?startapp=ref_${myRefCode}`;
+    const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
 
     // خواندن رفرر از همه مسیرهای ممکن:
     // 1) لینک t.me/bot/app?startapp=ref_X  -> start_param
@@ -324,6 +344,19 @@
     let referrerId = readReferrer();
     if (referrerId === myRefCode || referrerId === myRefCode.slice(-6).toUpperCase()) referrerId = null;
 
+    function fmtErr(data, fallback) {
+        const d = data && data.detail;
+        if (typeof d === 'string') return d;
+        if (Array.isArray(d)) return d.map(x => (x.loc ? x.loc.join('.') + ': ' : '') + x.msg).join(' | ');
+        return (data && data.message) || fallback || 'Error';
+    }
+
+    // مبلغ یکتا برای هر کاربر: 0.1 TON + (id mod 1,000,000) نانو (باید با سرور یکی باشد)
+    function payAmountNano() {
+        try { return String(100000000n + (BigInt(userId) % 1000000n)); }
+        catch (e) { return '100000000'; }
+    }
+
     function esc(s) {
         return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
@@ -336,7 +369,10 @@
       });
       tonConnectUI.onStatusChange(wallet => {
         const btnPay = document.getElementById('btn-pay');
-        if (btnPay) btnPay.disabled = !wallet;
+        if (btnPay) {
+          btnPay.disabled = false;
+          btnPay.textContent = wallet ? 'Deploy Miner' : 'Connect Wallet';
+        }
       });
     }
 
@@ -364,6 +400,7 @@
         document.getElementById('earned-referral').textContent = `+${data.referral_earned || 0}`;
 
         renderFriendsList(data.friends || []);
+        if (data.checkin) renderCheckin(data.checkin);
 
         if (data.rate_per_day && data.rate_per_day !== currentRatePerDay) {
             currentRatePerDay = data.rate_per_day;
@@ -500,9 +537,15 @@
     }
 
     async function payTON() {
-      if (!tonConnectUI?.account) return;
       const st = document.getElementById('status-pay');
       const btn = document.getElementById('btn-pay');
+      initTonConnect();
+
+      if (!tonConnectUI.account) {
+        try { await tonConnectUI.openModal(); } catch (e) { console.error(e); }
+        return;
+      }
+
       st.textContent = 'Confirm in wallet...';
       st.className = 'status';
       btn.disabled = true;
@@ -512,7 +555,7 @@
       try {
         const tx = {
             validUntil: Math.floor(Date.now() / 1000) + 600,
-            messages: [{ address: TON_RECEIVER, amount: '100000000' }]
+            messages: [{ address: TON_RECEIVER, amount: payAmountNano() }]
         };
         await tonConnectUI.sendTransaction(tx);
       } catch (e) {
@@ -525,7 +568,6 @@
       st.textContent = '⏳ Verifying payment on blockchain...';
       st.className = 'status ok';
 
-      // تراکنش چند ثانیه تا چند ده ثانیه طول می‌کشد تا روی بلاکچین بنشیند
       let confirmed = false;
       for (let i = 0; i < 18 && !confirmed; i++) {
           await new Promise(r => setTimeout(r, 5000));
@@ -553,6 +595,8 @@
     }
 
     function startApp() {
+      if (appStarted) return;   // sync هر ۱۵ ثانیه نباید کاربر را به داشبورد برگرداند
+      appStarted = true;
       showScreen('screen-dashboard');
       document.getElementById('main-nav').style.display = 'flex';
       document.getElementById('user-name').textContent = tgUser.first_name || "ZYR User";
@@ -588,7 +632,7 @@
           const res = await fetch(BACKEND + '/claim-mining', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, init_data: initData })
+              body: JSON.stringify({ user_id: userId, amount: pendingMined, init_data: initData })
           });
 
           const textResponse = await res.text();
@@ -613,7 +657,7 @@
                   isClaiming = false;
               }, 2000);
           } else {
-              throw new Error(data.detail || data.message || 'خطا در ثبت پاداش');
+              throw new Error(fmtErr(data, 'خطا در ثبت پاداش'));
           }
       } catch (e) {
           console.error(e);
@@ -698,7 +742,10 @@
                 init_data: initData
             })
         });
-        if (!res.ok) throw new Error('Server error');
+        if (!res.ok) {
+          let j = {}; try { j = await res.json(); } catch (e) {}
+          throw new Error(fmtErr(j, 'Server error'));
+        }
 
         await syncUser();
 
@@ -709,6 +756,61 @@
         st.textContent = '❌ ' + e.message;
         st.className = 'status err';
       }
+    }
+
+    function renderCheckin(c) {
+        lastCheckin = c;
+        const grid = document.getElementById('checkin-days');
+        const btn = document.getElementById('btn-checkin');
+        if (!grid || !btn) return;
+        let html = '';
+        (c.rewards || []).forEach((r, idx) => {
+            const day = idx + 1;
+            let cls = 'day-chip';
+            if (day <= c.claimed_days) cls += ' done';
+            else if (c.available && day === c.next_day) cls += ' today';
+            html += `<div class="${cls}">Day ${day}<b>+${r}</b></div>`;
+        });
+        grid.innerHTML = html;
+        if (c.completed) {
+            btn.disabled = true;
+            btn.textContent = '🎉 All 6 days completed';
+        } else if (c.available) {
+            btn.disabled = false;
+            btn.textContent = `Claim Day ${c.next_day} (+${c.next_reward} ZYR)`;
+        } else {
+            btn.disabled = true;
+            btn.textContent = `✅ Claimed — come back tomorrow (+${c.next_reward} ZYR)`;
+        }
+    }
+
+    async function claimDaily() {
+        const btn = document.getElementById('btn-checkin');
+        if (!lastCheckin || !lastCheckin.available) return;
+        btn.disabled = true;
+        btn.textContent = '⏳ Claiming...';
+        try {
+            const res = await fetch(BACKEND + '/daily-checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, init_data: initData })
+            });
+            let data = {};
+            try { data = await res.json(); } catch (e) {}
+            if (res.ok && data.ok) {
+                serverBalance = data.new_balance;
+                updateUI();
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                tg.showAlert(`🎁 Day ${data.day}: +${data.reward} ZYR`);
+                await syncUser();
+            } else {
+                throw new Error(fmtErr(data, 'Check-in failed'));
+            }
+        } catch (e) {
+            console.error(e);
+            tg.showAlert('❌ ' + e.message);
+            await syncUser();
+        }
     }
 
     syncUser();
