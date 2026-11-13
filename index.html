@@ -300,7 +300,7 @@
 
     // کد رفرال = آیدی کامل کاربر (یکتا، بدون تداخل)
     const myRefCode = userId;
-    const myRefLink = `https://t.me/ZYRMining_bot?start=ref_${myRefCode}`;
+    const myRefLink = `${BOT_APP_LINK}?startapp=ref_${myRefCode}`;
 
     // خواندن رفرر از همه مسیرهای ممکن:
     // 1) لینک t.me/bot/app?startapp=ref_X  -> start_param
@@ -588,7 +588,7 @@
           const res = await fetch(BACKEND + '/claim-mining', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, amount: pendingMined, init_data: initData })
+              body: JSON.stringify({ user_id: userId, init_data: initData })
           });
 
           const textResponse = await res.text();
@@ -613,9 +613,7 @@
                   isClaiming = false;
               }, 2000);
           } else {
-              const d = data.detail;
-              const msg = typeof d === 'string' ? d : (Array.isArray(d) ? d.map(x => (x.loc ? x.loc.join('.') + ': ' : '') + x.msg).join(' | ') : (data.message || 'خطا در ثبت پاداش'));
-              throw new Error(msg);
+              throw new Error(data.detail || data.message || 'خطا در ثبت پاداش');
           }
       } catch (e) {
           console.error(e);
