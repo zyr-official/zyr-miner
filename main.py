@@ -170,34 +170,6 @@ def find_referrer(c, code: str | None):
     return None
 
 
-
-def register_with_referrer(uid: str, first_name: str, code: str | None):
-    """کاربر را (اگر نبود) می‌سازد و در صورت داشتن کد معتبر، به رفرر وصل می‌کند."""
-    conn = get_db()
-    try:
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE id=?", (uid,))
-        user = c.fetchone()
-        if not user:
-            c.execute("INSERT INTO users (id, first_name, last_mining) VALUES (?,?,?)",
-                      (uid, first_name, time.time()))
-            has_ref = False
-        else:
-            has_ref = bool(user["referrer_id"])
-        if code and not has_ref:
-            ref_id = find_referrer(c, code)
-            if ref_id and ref_id != uid:
-                c.execute("SELECT referrer_id FROM users WHERE id=?", (ref_id,))
-                r = c.fetchone()
-                if not (r and r["referrer_id"] == uid):
-                    c.execute("UPDATE users SET referrer_id=? WHERE id=?", (ref_id, uid))
-                    c.execute("INSERT OR IGNORE INTO referrals (referrer_id, friend_id, reward_claimed) VALUES (?,?,0)",
-                              (ref_id, uid))
-        conn.commit()
-    finally:
-        conn.close()
-
-
 telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
 
 
@@ -477,23 +449,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user or not update.message:
         return
     name = update.effective_user.first_name or "Miner"
-    uid = str(update.effective_user.id)
     url = WEBAPP_URL
-    ref_code = None
     if context.args and context.args[0].startswith("ref_"):
-        ref_code = context.args[0][4:]
         # با ?startapp= در فرانت از location.search خوانده می‌شود
         url += f"?startapp={context.args[0]}"
-    print(f"[START] uid={uid} args={context.args} ref_code={ref_code}")
-    try:
-        # همین‌جا ثبت می‌شود تا دوست بلافاصله (نارنجی) در لیست رفرر دیده شود
-        register_with_referrer(uid, name, ref_code)
-        conn = get_db()
-        row = conn.execute("SELECT referrer_id FROM users WHERE id=?", (uid,)).fetchone()
-        conn.close()
-        print(f"[START] saved referrer_id={row['referrer_id'] if row else None}")
-    except Exception as e:
-        print(f"[START] register error: {e!r}")
 
     text = (
         f"⚡ Welcome to ZYR Cloud Miner, {name}!\n\n"
